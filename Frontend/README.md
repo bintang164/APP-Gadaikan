@@ -3,10 +3,10 @@
 Aplikasi pengajuan gadai digital untuk prototipe akademik. Dibangun dengan
 Flutter (Android) dan disiapkan untuk backend Laravel REST API.
 
-> **Status:** Prompt 01–06 selesai: design system, splash & onboarding,
-> login/register/autentikasi, Home Dashboard, pemilihan kategori, dan
-> form pengajuan elektronik bertahap. Backend Laravel dan fitur lanjutan
-> masih memakai mode demo berlabel.
+> **Status:** Prompt 01–08 selesai: design system, splash & onboarding,
+> login/register/autentikasi, Home Dashboard, pemilihan kategori, serta
+> form pengajuan Elektronik, Emas, dan BPKB. Backend Laravel dan fitur
+> lanjutan masih memakai mode demo berlabel.
 
 ## Fitur yang sudah berjalan
 
@@ -36,8 +36,14 @@ Flutter (Android) dan disiapkan untuk backend Laravel REST API.
   Kelengkapan → Unggah Berkas → Tinjau & Kirim. Chips untuk pilihan
   terstruktur, helper text, validasi, draf lokal, dan tombol Lanjut aktif
   hanya bila field wajib valid. Tidak ada taksiran harga otomatis.
-- Form pengajuan per kategori, upload dokumen, riwayat, detail
-  transaksi, outlet, promo, notifikasi, dan FAQ (mode demo berlabel).
+- **Form emas**: chips jenis/kondisi, kadar opsional tervalidasi, berat
+  numerik positif (0,01–10.000 gram), penjelasan bahwa berat/kadar masih
+  perkiraan, tanpa harga emas real-time; taksiran final setelah pemeriksaan.
+- **Form BPKB**: merek & model terpisah, tahun 4 digit, format nomor
+  polisi, pemberitahuan privasi dokumen, nomor polisi disamarkan di
+  ringkasan/detail, tanpa klaim pengecekan legalitas otomatis.
+- Upload dokumen, riwayat, detail transaksi, outlet, promo, notifikasi,
+  dan FAQ (mode demo berlabel).
 - Theme terpusat Navy Blue + Gold dengan komponen reusable.
 
 ## Yang belum dibuat
@@ -130,7 +136,7 @@ flutter build apk --debug
 Status terakhir:
 
 - `flutter analyze`: tidak ada issue.
-- `flutter test`: **11 test lulus** (auth + kategori/form + widget).
+- `flutter test`: **16 test lulus** (auth, kategori/form, emas/BPKB, widget).
 - `flutter build web --release`: berhasil.
 - `flutter build apk --debug`: berhasil.
 

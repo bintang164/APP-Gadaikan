@@ -23,6 +23,7 @@ class AppTextField extends StatelessWidget {
     this.onChanged,
     this.inputFormatters,
     this.enabled = true,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final String label;
@@ -40,6 +41,7 @@ class AppTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final List<TextInputFormatter>? inputFormatters;
   final bool enabled;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +64,7 @@ class AppTextField extends StatelessWidget {
           onChanged: onChanged,
           inputFormatters: inputFormatters,
           enabled: enabled,
+          textCapitalization: textCapitalization,
           style: AppTextStyles.body,
           decoration: InputDecoration(
             hintText: hint,

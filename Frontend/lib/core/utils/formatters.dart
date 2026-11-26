@@ -52,6 +52,18 @@ class AppFormatters {
     if (cleaned.isEmpty) return null;
     return double.tryParse(cleaned);
   }
+
+  /// Menyembunyikan sebagian nomor polisi di tampilan umum/log.
+  static String maskPlate(String value) {
+    final String trimmed = value.trim().toUpperCase();
+    if (trimmed.length <= 5) return trimmed;
+    final RegExpMatch? match =
+        RegExp(r'^([A-Z]{1,2}\s*)(\d{2,4})(.*)$').firstMatch(trimmed);
+    if (match == null) {
+      return '${trimmed.substring(0, 3)}••••';
+    }
+    return '${match.group(1) ?? ''}••••${match.group(3) ?? ''}';
+  }
 }
 
 class AppValidators {
@@ -104,6 +116,67 @@ class AppValidators {
     }
     if (value.length < 8) {
       return 'Kata sandi minimal 8 karakter';
+    }
+    return null;
+  }
+
+  /// Angka desimal positif dalam batas wajar, misalnya berat emas.
+  static String? positiveDecimal(
+    String? value, {
+    String label = 'Nilai',
+    required double min,
+    required double max,
+  }) {
+    final String? required = requiredField(value, label: label);
+    if (required != null) return required;
+    final double? parsed = double.tryParse(value!.trim().replaceAll(',', '.'));
+    if (parsed == null || parsed.isNaN) {
+      return '$label harus berupa angka.';
+    }
+    if (parsed <= 0) {
+      return '$label harus lebih dari 0.';
+    }
+    if (parsed < min || parsed > max) {
+      return '$label harus antara $min dan $max.';
+    }
+    return null;
+  }
+
+  /// Kadar/karat opsional; menerima "22", "22 Karat", atau "99.9%".
+  static String? karat(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final RegExp number = RegExp(r'(\d+(?:\.\d+)?)');
+    final Match? match = number.firstMatch(value.trim());
+    if (match == null) return 'Kadar/karat harus berupa angka.';
+    final double? parsed = double.tryParse(match.group(1) ?? '');
+    if (parsed == null || parsed <= 0 || parsed > 100) {
+      return 'Kadar/karat harus antara 0 dan 100.';
+    }
+    return null;
+  }
+
+  /// Tahun kendaraan 4 digit dalam rentang wajar.
+  static String? vehicleYear(String? value) {
+    final String? required = requiredField(value, label: 'Tahun kendaraan');
+    if (required != null) return required;
+    final int now = DateTime.now().year;
+    final int? parsed = int.tryParse(value!.trim());
+    if (parsed == null || value.trim().length != 4) {
+      return 'Tahun kendaraan harus 4 digit (contoh: 2024).';
+    }
+    if (parsed < 1980 || parsed > now + 1) {
+      return 'Tahun kendaraan harus antara 1980 dan ${now + 1}.';
+    }
+    return null;
+  }
+
+  /// Nomor polisi Indonesia, misalnya "B 4123 DEMO".
+  static String? plateNumber(String? value) {
+    final String? required = requiredField(value, label: 'Nomor polisi');
+    if (required != null) return required;
+    final String trimmed = value!.trim().toUpperCase();
+    if (!RegExp(r'^[A-Z]{1,2}\s*\d{2,4}\s*[A-Z]{0,4}$').hasMatch(trimmed)) {
+      return 'Format nomor polisi tidak valid (contoh: B 4123 DEMO).';
     }
     return null;
   }

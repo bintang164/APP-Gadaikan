@@ -67,15 +67,20 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
   // BPKB controllers
   final _vehicleTypeCtrl = TextEditingController();
   final _vehicleBrandModelCtrl = TextEditingController();
+  final _vehicleBrandCtrl = TextEditingController();
+  final _vehicleModelCtrl = TextEditingController();
   final _vehicleYearCtrl = TextEditingController();
   final _plateCtrl = TextEditingController();
   final _ownerNameCtrl = TextEditingController();
 
-  // Pilihan terstruktur untuk form elektronik.
+  // Pilihan terstruktur lintas kategori.
   String? _deviceTypeChoice;
   String? _physicalChoice;
   String? _functionChoice;
   List<String> _accessories = <String>[];
+  String? _goldTypeChoice;
+  String? _goldConditionChoice;
+  String? _vehicleTypeChoice;
 
   // Uploaded documents keyed by slot id
   final Map<String, PawnDocument> _uploadedDocs = {};
@@ -130,6 +135,16 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
         case PawnCategory.bpkb:
           _vehicleTypeCtrl.text = d['Jenis Kendaraan'] ?? '';
           _vehicleBrandModelCtrl.text = d['Merek & Model'] ?? '';
+          // Kompatibilitas dengan draf lama yang menggabungkan merek & model.
+          final List<String> legacyParts = (d['Merek & Model'] ?? '')
+              .toString()
+              .split(RegExp(r'\s+'))
+              .where((String part) => part.isNotEmpty)
+              .toList();
+          _vehicleBrandCtrl.text =
+              d['Merek'] ?? (legacyParts.isEmpty ? '' : legacyParts.first);
+          _vehicleModelCtrl.text = d['Model/Tipe'] ??
+              (legacyParts.length < 2 ? '' : legacyParts.sublist(1).join(' '));
           _vehicleYearCtrl.text = d['Tahun Kendaraan'] ?? '';
           _plateCtrl.text = d['Nomor Polisi'] ?? '';
           _ownerNameCtrl.text = d['Nama Pemilik Dokumen'] ?? '';
@@ -163,13 +178,19 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
         _funcCondCtrl.text = draft.text('functionCondition') ?? '';
         _accessoriesCtrl.text = draft.text('accessoriesText') ?? '';
         _serialCtrl.text = draft.text('serial') ?? '';
-      } else {
+      } else if (_category == PawnCategory.emas) {
+        _goldTypeChoice = draft.text('goldTypeChoice');
+        _goldConditionChoice = draft.text('goldConditionChoice');
         _goldTypeCtrl.text = draft.text('goldType') ?? '';
         _karatCtrl.text = draft.text('karat') ?? '';
         _weightCtrl.text = draft.text('weight') ?? '';
         _goldCondCtrl.text = draft.text('goldCondition') ?? '';
+      } else {
+        _vehicleTypeChoice = draft.text('vehicleTypeChoice');
         _vehicleTypeCtrl.text = draft.text('vehicleType') ?? '';
         _vehicleBrandModelCtrl.text = draft.text('vehicleBrandModel') ?? '';
+        _vehicleBrandCtrl.text = draft.text('vehicleBrand') ?? '';
+        _vehicleModelCtrl.text = draft.text('vehicleModel') ?? '';
         _vehicleYearCtrl.text = draft.text('vehicleYear') ?? '';
         _plateCtrl.text = draft.text('plate') ?? '';
         _ownerNameCtrl.text = draft.text('ownerName') ?? '';
@@ -204,13 +225,21 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
         'functionCondition': _funcCondCtrl.text,
         'serial': _serialCtrl.text,
       });
-    } else {
+    } else if (_category == PawnCategory.emas) {
       data.addAll(<String, dynamic>{
+        'goldTypeChoice': _goldTypeChoice,
+        'goldConditionChoice': _goldConditionChoice,
         'karat': _karatCtrl.text,
         'weight': _weightCtrl.text,
         'goldCondition': _goldCondCtrl.text,
+      });
+    } else {
+      data.addAll(<String, dynamic>{
+        'vehicleTypeChoice': _vehicleTypeChoice,
         'vehicleType': _vehicleTypeCtrl.text,
         'vehicleBrandModel': _vehicleBrandModelCtrl.text,
+        'vehicleBrand': _vehicleBrandCtrl.text,
+        'vehicleModel': _vehicleModelCtrl.text,
         'vehicleYear': _vehicleYearCtrl.text,
         'plate': _plateCtrl.text,
         'ownerName': _ownerNameCtrl.text,
@@ -243,6 +272,8 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
     _goldCondCtrl.dispose();
     _vehicleTypeCtrl.dispose();
     _vehicleBrandModelCtrl.dispose();
+    _vehicleBrandCtrl.dispose();
+    _vehicleModelCtrl.dispose();
     _vehicleYearCtrl.dispose();
     _plateCtrl.dispose();
     _ownerNameCtrl.dispose();
@@ -273,9 +304,15 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
         PawnCategory.emas => const [
             _DocSlotConfig(
               title: 'Foto Emas / Perhiasan',
-              subtitle: 'Pastikan foto jelas dengan pencahayaan cukup',
+              subtitle: 'Ambil dari beberapa sisi: depan, belakang, dan detail',
               required: true,
               sampleFile: 'emas_barang.jpg',
+            ),
+            _DocSlotConfig(
+              title: 'Foto Emas (Sisi Tambahan)',
+              subtitle: 'Opsional, membantu verifikasi bagian lain barang',
+              required: false,
+              sampleFile: 'emas_sisi.jpg',
             ),
             _DocSlotConfig(
               title: 'Foto Bukti Pembelian / Sertifikat',
@@ -297,6 +334,12 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
               subtitle: 'Tampak samping atau depan beserta pelat nomor',
               required: true,
               sampleFile: 'kendaraan_tampak.jpg',
+            ),
+            _DocSlotConfig(
+              title: 'Dokumen Pendukung (Opsional)',
+              subtitle: 'Misalnya bukti kepemilikan tambahan bila tersedia',
+              required: false,
+              sampleFile: 'bpkb_pendukung.jpg',
             ),
           ],
       };
@@ -338,7 +381,8 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
         details['Kondisi'] = _goldCondCtrl.text.trim();
       case PawnCategory.bpkb:
         details['Jenis Kendaraan'] = _vehicleTypeCtrl.text.trim();
-        details['Merek & Model'] = _vehicleBrandModelCtrl.text.trim();
+        details['Merek'] = _vehicleBrandCtrl.text.trim();
+        details['Model/Tipe'] = _vehicleModelCtrl.text.trim();
         details['Tahun Kendaraan'] = _vehicleYearCtrl.text.trim();
         details['Nomor Polisi'] = _plateCtrl.text.trim().toUpperCase();
         details['Nama Pemilik Dokumen'] = _ownerNameCtrl.text.trim();
@@ -360,13 +404,21 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
         }
         if (_category == PawnCategory.emas) {
           return _goldTypeCtrl.text.trim().isNotEmpty &&
-              _weightCtrl.text.trim().isNotEmpty &&
+              AppValidators.positiveDecimal(
+                    _weightCtrl.text,
+                    label: 'Berat',
+                    min: 0.01,
+                    max: 10000,
+                  ) ==
+                  null &&
+              AppValidators.karat(_karatCtrl.text) == null &&
               _goldCondCtrl.text.trim().isNotEmpty;
         }
         return _vehicleTypeCtrl.text.trim().isNotEmpty &&
-            _vehicleBrandModelCtrl.text.trim().isNotEmpty &&
-            _vehicleYearCtrl.text.trim().isNotEmpty &&
-            _plateCtrl.text.trim().isNotEmpty &&
+            _vehicleBrandCtrl.text.trim().isNotEmpty &&
+            _vehicleModelCtrl.text.trim().isNotEmpty &&
+            AppValidators.vehicleYear(_vehicleYearCtrl.text) == null &&
+            AppValidators.plateNumber(_plateCtrl.text) == null &&
             _ownerNameCtrl.text.trim().isNotEmpty;
       case 1:
         if (_category == PawnCategory.elektronik) {
@@ -596,7 +648,7 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Data berat dan kadar yang Anda masukkan merupakan perkiraan awal. Hasil akhir menunggu pemeriksaan fisik.',
+                        'Berat dan kadar yang kamu masukkan adalah perkiraan sebelum pemeriksaan. Aplikasi tidak menampilkan harga emas real-time. Nilai taksiran final hanya ditentukan setelah pemeriksaan fisik dan persetujuan.',
                         style: AppTextStyles.caption,
                       ),
                     ),
@@ -618,7 +670,7 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Peringatan Privasi: Dokumen BPKB dan data kendaraan hanya digunakan untuk proses verifikasi dan tidak ditampilkan secara publik.',
+                        'Privasi dokumen: BPKB dan dokumen pendukung hanya dipakai untuk verifikasi, disimpan privat di backend, dan hanya dapat diakses petugas berwenang. Aplikasi tidak melakukan pengecekan legalitas kendaraan otomatis.',
                         style: AppTextStyles.caption,
                       ),
                     ),
@@ -897,78 +949,208 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
 
   List<Widget> _buildEmasFields() {
     return [
-      AppTextField(
-        label: 'Jenis Emas / Perhiasan',
-        controller: _goldTypeCtrl,
-        hint: 'Contoh: Cincin, Kalung, Logam Mulia',
-        validator: (v) => AppValidators.requiredField(v, label: 'Jenis emas'),
+      _ChoiceChips(
+        label: 'Jenis Emas / Perhiasan *',
+        helper: 'Pilih jenis yang paling sesuai.',
+        choices: const [
+          'Cincin',
+          'Kalung',
+          'Gelang',
+          'Anting',
+          'Logam Mulia',
+          'Lainnya',
+        ],
+        selected: _goldTypeChoice,
+        onSelected: (String value) {
+          setState(() {
+            _goldTypeChoice = value;
+            _goldTypeCtrl.text = value == 'Lainnya' ? '' : value;
+            _saveDraft();
+          });
+        },
       ),
+      if (_goldTypeChoice == 'Lainnya') ...[
+        const SizedBox(height: AppSpacing.md),
+        AppTextField(
+          label: 'Jenis Emas Lainnya *',
+          controller: _goldTypeCtrl,
+          hint: 'Contoh: Bros, Liontin',
+          helperText: 'Wajib diisi bila memilih Lainnya.',
+          validator: (v) =>
+              AppValidators.requiredField(v, label: 'Jenis emas'),
+          onChanged: (_) {
+            setState(() {});
+            _saveDraft();
+          },
+        ),
+      ],
       const SizedBox(height: AppSpacing.md),
       AppTextField(
         label: 'Kadar / Karat (Opsional)',
         controller: _karatCtrl,
         hint: 'Contoh: 22 Karat / 99.9%',
+        helperText: 'Perkiraan; kosongkan bila tidak diketahui.',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,%A-Za-z ]')),
+        ],
+        validator: AppValidators.karat,
+        onChanged: (_) {
+          setState(() {});
+          _saveDraft();
+        },
       ),
       const SizedBox(height: AppSpacing.md),
       AppTextField(
-        label: 'Perkiraan Berat (Gram)',
+        label: 'Perkiraan Berat (Gram) *',
         controller: _weightCtrl,
         hint: 'Contoh: 5.5',
+        helperText: 'Perkiraan sebelum pemeriksaan; rentang 0,01–10.000 gram.',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        validator: (v) => AppValidators.requiredField(v, label: 'Berat emas'),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'^\d+[.,]?\d*$')),
+        ],
+        validator: (v) => AppValidators.positiveDecimal(
+          v,
+          label: 'Berat',
+          min: 0.01,
+          max: 10000,
+        ),
+        onChanged: (_) {
+          setState(() {});
+          _saveDraft();
+        },
       ),
       const SizedBox(height: AppSpacing.md),
-      AppTextField(
-        label: 'Kondisi Barang',
-        controller: _goldCondCtrl,
-        hint: 'Contoh: Baik, tidak patah/penyok',
-        validator: (v) => AppValidators.requiredField(v, label: 'Kondisi'),
+      _ChoiceChips(
+        label: 'Kondisi Barang *',
+        helper: 'Pilih kondisi yang paling menggambarkan barang.',
+        choices: const [
+          'Baik',
+          'Ada goresan ringan',
+          'Penyok / berubah bentuk',
+          'Lainnya',
+        ],
+        selected: _goldConditionChoice,
+        onSelected: (String value) {
+          setState(() {
+            _goldConditionChoice = value;
+            _goldCondCtrl.text = value == 'Lainnya' ? '' : value;
+            _saveDraft();
+          });
+        },
       ),
+      if (_goldConditionChoice == 'Lainnya') ...[
+        const SizedBox(height: AppSpacing.md),
+        AppTextField(
+          label: 'Kondisi Barang Lainnya *',
+          controller: _goldCondCtrl,
+          hint: 'Jelaskan kondisi barang',
+          validator: (v) =>
+              AppValidators.requiredField(v, label: 'Kondisi barang'),
+          onChanged: (_) {
+            setState(() {});
+            _saveDraft();
+          },
+        ),
+      ],
     ];
   }
 
   List<Widget> _buildBpkbFields() {
     return [
+      _ChoiceChips(
+        label: 'Jenis Kendaraan *',
+        helper: 'Pilih jenis kendaraan sesuai BPKB.',
+        choices: const ['Sepeda Motor', 'Mobil', 'Lainnya'],
+        selected: _vehicleTypeChoice,
+        onSelected: (String value) {
+          setState(() {
+            _vehicleTypeChoice = value;
+            _vehicleTypeCtrl.text = value == 'Lainnya' ? '' : value;
+            _saveDraft();
+          });
+        },
+      ),
+      if (_vehicleTypeChoice == 'Lainnya') ...[
+        const SizedBox(height: AppSpacing.md),
+        AppTextField(
+          label: 'Jenis Kendaraan Lainnya *',
+          controller: _vehicleTypeCtrl,
+          hint: 'Contoh: Truk, Bus',
+          validator: (v) =>
+              AppValidators.requiredField(v, label: 'Jenis kendaraan'),
+          onChanged: (_) {
+            setState(() {});
+            _saveDraft();
+          },
+        ),
+      ],
+      const SizedBox(height: AppSpacing.md),
       AppTextField(
-        label: 'Jenis Kendaraan',
-        controller: _vehicleTypeCtrl,
-        hint: 'Contoh: Sepeda Motor / Mobil',
-        validator: (v) =>
-            AppValidators.requiredField(v, label: 'Jenis kendaraan'),
+        label: 'Merek *',
+        controller: _vehicleBrandCtrl,
+        hint: 'Contoh: Honda, Toyota',
+        helperText: 'Merek sesuai dokumen kendaraan.',
+        validator: (v) => AppValidators.requiredField(v, label: 'Merek'),
+        onChanged: (_) {
+          setState(() {});
+          _saveDraft();
+        },
       ),
       const SizedBox(height: AppSpacing.md),
       AppTextField(
-        label: 'Merek & Model Kendaraan',
-        controller: _vehicleBrandModelCtrl,
-        hint: 'Contoh: Honda Vario 160 CBS',
-        validator: (v) =>
-            AppValidators.requiredField(v, label: 'Merek & model'),
+        label: 'Model / Tipe *',
+        controller: _vehicleModelCtrl,
+        hint: 'Contoh: Vario 160 CBS, Avanza G',
+        validator: (v) => AppValidators.requiredField(v, label: 'Model/tipe'),
+        onChanged: (_) {
+          setState(() {});
+          _saveDraft();
+        },
       ),
       const SizedBox(height: AppSpacing.md),
       AppTextField(
-        label: 'Tahun Kendaraan',
+        label: 'Tahun Kendaraan *',
         controller: _vehicleYearCtrl,
         hint: 'Contoh: 2024',
+        helperText: '4 digit, antara 1980 dan tahun berjalan + 1.',
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        validator: (v) =>
-            AppValidators.requiredField(v, label: 'Tahun kendaraan'),
+        validator: AppValidators.vehicleYear,
+        onChanged: (_) {
+          setState(() {});
+          _saveDraft();
+        },
       ),
       const SizedBox(height: AppSpacing.md),
       AppTextField(
-        label: 'Nomor Polisi',
+        label: 'Nomor Polisi *',
         controller: _plateCtrl,
         hint: 'Contoh: B 4123 DEMO',
-        validator: (v) =>
-            AppValidators.requiredField(v, label: 'Nomor polisi'),
+        helperText:
+            'Format B 4123 DEMO. Di ringkasan ditampilkan sebagian saja.',
+        textCapitalization: TextCapitalization.characters,
+        validator: AppValidators.plateNumber,
+        onChanged: (_) {
+          setState(() {});
+          _saveDraft();
+        },
       ),
       const SizedBox(height: AppSpacing.md),
       AppTextField(
-        label: 'Nama Pemilik Sesuai Dokumen',
+        label: 'Nama Pemilik Sesuai Dokumen *',
         controller: _ownerNameCtrl,
         hint: 'Nama yang tertera pada BPKB',
-        validator: (v) =>
-            AppValidators.requiredField(v, label: 'Nama pemilik dokumen'),
+        helperText: 'Samakan dengan kepemilikan pada dokumen.',
+        validator: (v) => AppValidators.requiredField(
+          v,
+          label: 'Nama pemilik dokumen',
+        ),
+        onChanged: (_) {
+          setState(() {});
+          _saveDraft();
+        },
       ),
     ];
   }
@@ -989,6 +1171,28 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
           'Pastikan gambar tidak buram dan informasi terlihat jelas. Format JPG/PNG, maks 5 MB.',
           style: AppTextStyles.bodySecondary,
         ),
+        if (_category == PawnCategory.bpkb) ...[
+          const SizedBox(height: AppSpacing.md),
+          AppCard(
+            backgroundColor: AppColors.primarySoft,
+            borderColor: AppColors.primary.withValues(alpha: 0.2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Icon(Icons.lock_outline_rounded,
+                    size: 18, color: AppColors.primary),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Berkas sensitif disimpan privat dan hanya diakses petugas '
+                    'berwenang. Nomor dokumen penuh tidak ditampilkan di halaman umum.',
+                    style: AppTextStyles.caption,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: AppSpacing.md),
         for (final slot in _docSlots) ...[
           DocumentUploadTile(
@@ -1062,7 +1266,10 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
                       Expanded(
                         flex: 6,
                         child: Text(
-                          entry.value,
+                          _category == PawnCategory.bpkb &&
+                                  entry.key == 'Nomor Polisi'
+                              ? AppFormatters.maskPlate(entry.value)
+                              : entry.value,
                           style: AppTextStyles.bodyMedium,
                           textAlign: TextAlign.right,
                         ),

@@ -325,7 +325,13 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     for (final entry in app.itemDetails.entries)
-                      _DetailRow(label: entry.key, value: entry.value),
+                      _DetailRow(
+                        label: entry.key,
+                        value: app.category == PawnCategory.bpkb &&
+                                entry.key == 'Nomor Polisi'
+                            ? AppFormatters.maskPlate(entry.value)
+                            : entry.value,
+                      ),
                     const Divider(),
                     const SizedBox(height: 8),
                     Text(
