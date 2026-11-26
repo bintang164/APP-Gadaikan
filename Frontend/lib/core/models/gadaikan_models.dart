@@ -555,6 +555,62 @@ class PawnTransaction {
   double get remainingAmount =>
       (totalDue - paidAmount).clamp(0, double.infinity).toDouble();
 
+  factory PawnTransaction.fromApiJson(Map<String, dynamic> json) {
+    final Object? rawPayments = json['payments'];
+    final List<DemoPayment> payments = <DemoPayment>[];
+    if (rawPayments is List) {
+      for (final Object? item in rawPayments) {
+        if (item is! Map) continue;
+        final Map<String, dynamic> payment = Map<String, dynamic>.from(item);
+        payments.add(
+          DemoPayment(
+            id: '${payment['id'] ?? ''}',
+            amount: payment['amount'] is num
+                ? (payment['amount'] as num).toDouble()
+                : 0,
+            method: '${payment['method'] ?? 'Simulasi Demo'}',
+            paidAt: DateTime.tryParse('${payment['paid_at'] ?? ''}') ?? DateTime.now(),
+            note: payment['note']?.toString(),
+          ),
+        );
+      }
+    }
+
+    final String statusRaw =
+        '${json['status'] ?? 'active'}'.replaceAll('-', '_').toLowerCase();
+    TransactionStatus status = TransactionStatus.active;
+    for (final TransactionStatus candidate in TransactionStatus.values) {
+      final String candidateSnake =
+          candidate.name.replaceAllMapped(RegExp(r'(?<!^)(?=[A-Z])'), (Match m) => '_').toLowerCase();
+      if (candidateSnake == statusRaw || candidate.name == statusRaw) {
+        status = candidate;
+        break;
+      }
+    }
+
+    return PawnTransaction(
+      id: '${json['id'] ?? json['transaction_id'] ?? ''}',
+      code: '${json['code'] ?? json['number'] ?? ''}',
+      applicationId: '${json['application_id'] ?? ''}',
+      itemTitle: '${json['item_title'] ?? json['title'] ?? ''}',
+      category: PawnCategory.fromId('${json['category'] ?? ''}') ?? PawnCategory.elektronik,
+      principalAmount: json['principal_amount'] is num
+          ? (json['principal_amount'] as num).toDouble()
+          : 0,
+      feeAmount: json['fee_amount'] is num
+          ? (json['fee_amount'] as num).toDouble()
+          : 0,
+      paidAmount: json['paid_amount'] is num
+          ? (json['paid_amount'] as num).toDouble()
+          : 0,
+      tenorDays: json['tenor_days'] is num ? (json['tenor_days'] as num).toInt() : 0,
+      startDate: DateTime.tryParse('${json['start_date'] ?? ''}') ?? DateTime.now(),
+      dueDate: DateTime.tryParse('${json['due_date'] ?? ''}') ?? DateTime.now(),
+      status: status,
+      payments: payments,
+    );
+  }
+
   PawnTransaction copyWith({
     double? paidAmount,
     TransactionStatus? status,

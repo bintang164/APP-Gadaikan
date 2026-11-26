@@ -3,11 +3,12 @@
 Aplikasi pengajuan gadai digital untuk prototipe akademik. Dibangun dengan
 Flutter (Android) dan disiapkan untuk backend Laravel REST API.
 
-> **Status:** Prompt 01–14 selesai: design system, splash & onboarding,
+> **Status:** Prompt 01–16 selesai: design system, splash & onboarding,
 > autentikasi, Home Dashboard, form Elektronik/Emas/BPKB, upload dokumen,
-> simulasi, review & kirim, daftar berfilter, detail + timeline status, dan
-> panel admin web terpisah. Backend Laravel belum tersedia; mode demo diberi
-> label dan tidak mengklaim data tersimpan di server.
+> simulasi, review & kirim, daftar berfilter, detail + timeline status,
+> panel admin web terpisah, penaksiran/penawaran, dan detail transaksi +
+> pembayaran demo. Backend Laravel belum tersedia; mode demo diberi label
+> dan tidak mengklaim data tersimpan di server.
 
 ## Fitur yang sudah berjalan
 
@@ -62,11 +63,20 @@ Flutter (Android) dan disiapkan untuk backend Laravel REST API.
   badge status, dokumen sensitif disembunyikan, aksi sesuai status (perbaiki,
   penawaran, alasan ditolak yang sopan). Transisi status **tidak** diubah
   dari Flutter; backend yang memvalidasi.
+- **Penaksiran & penawaran**: admin mengisi nilai taksiran, plafon, nominal
+  disetujui, tenor, biaya, tanggal mulai/jatuh tempo, dan catatan nasabah;
+  backend menyimpan actor + timestamp. Nasabah meninjau penawaran dan
+  menerima/menolak; keputusan dicatat backend. Tarif tidak disebut resmi
+  bila masih demo.
+- **Detail transaksi & pembayaran demo**: rincian pokok/biaya/tenor/jatuh
+  tempo/total, riwayat pembayaran, dan alur dua langkah (input → konfirmasi)
+  dengan label **SIMULASI / DEMO**. Tidak ada payment gateway sungguhan;
+  status lunas hanya ditetapkan backend sesuai aturan.
 - **Panel admin** terpisah di `../Admin/` (web statis, bukan navigasi
   nasabah): dashboard, pencarian/filter/pagination, detail terotorisasi,
-  aksi revisi/proses/setujui/tolak dengan alasan wajib, peran admin.
-- Riwayat, detail transaksi, outlet, promo, notifikasi, dan FAQ (mode demo
-  berlabel).
+  form penaksiran, aksi revisi/proses/setujui/tolak dengan alasan wajib,
+  peran admin.
+- Riwayat, outlet, promo, notifikasi, dan FAQ (mode demo berlabel).
 - Theme terpusat Navy Blue + Gold dengan komponen reusable.
 
 ## Yang belum dibuat
@@ -159,7 +169,7 @@ flutter build apk --debug
 Status terakhir:
 
 - `flutter analyze`: tidak ada issue.
-- `flutter test`: **33 test lulus** (auth, form, upload/simulasi, submit/daftar, detail/status, widget).
+- `flutter test`: **39 test lulus** (auth, form, upload/simulasi, submit/daftar, detail/status, penawaran/pembayaran, widget).
 - `flutter build web --release`: berhasil.
 - `flutter build apk --debug`: berhasil.
 

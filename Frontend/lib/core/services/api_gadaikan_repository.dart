@@ -183,4 +183,105 @@ class ApiGadaikanRepository extends MockGadaikanRepository {
       throw Exception(ApiErrorMapper.messageFor(error));
     }
   }
+
+  static const String transactionsPath = '/transactions';
+
+  @override
+  Future<List<PawnTransaction>> getTransactions() async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.get<dynamic>(
+        transactionsPath,
+        options: Options(headers: await _headers()),
+      );
+      final Object? payload = response.data;
+      final List<dynamic> raw = payload is List
+          ? payload
+          : (ApiClient.extractMap(payload)['data'] as List? ?? <dynamic>[]);
+      return raw
+          .whereType<Map<dynamic, dynamic>>()
+          .map(
+            (Map<dynamic, dynamic> item) => PawnTransaction.fromApiJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
+          .toList();
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<PawnTransaction> getTransactionDetail(String id) async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.get<dynamic>(
+        '$transactionsPath/$id',
+        options: Options(headers: await _headers()),
+      );
+      final Map<String, dynamic> body = ApiClient.extractMap(response.data);
+      final Object? json = body['transaction'] ?? body;
+      if (json is! Map) throw Exception('Detail transaksi tidak tersedia.');
+      return PawnTransaction.fromApiJson(Map<String, dynamic>.from(json));
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<PawnTransaction> acceptOffer(String applicationId) async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.post<dynamic>(
+        '$applicationsPath/$applicationId/accept-offer',
+        options: Options(headers: await _headers()),
+      );
+      final Map<String, dynamic> body = ApiClient.extractMap(response.data);
+      final Object? json = body['transaction'] ?? body;
+      if (json is! Map) {
+        throw Exception('Server tidak mengembalikan data transaksi.');
+      }
+      return PawnTransaction.fromApiJson(Map<String, dynamic>.from(json));
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<PawnApplication> declineOffer(String applicationId) async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.post<dynamic>(
+        '$applicationsPath/$applicationId/decline-offer',
+        options: Options(headers: await _headers()),
+      );
+      final Map<String, dynamic> body = ApiClient.extractMap(response.data);
+      final Object? json = body['application'] ?? body;
+      if (json is! Map) throw Exception('Server tidak mengembalikan detail pengajuan.');
+      return PawnApplication.fromApiJson(Map<String, dynamic>.from(json));
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<PawnTransaction> recordDemoPayment({
+    required String transactionId,
+    required double amount,
+    required String method,
+  }) async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.post<dynamic>(
+        '$transactionsPath/$transactionId/demo-payment',
+        options: Options(headers: await _headers()),
+        data: <String, dynamic>{
+          'amount': amount,
+          'method': method,
+          'is_demo': true,
+        },
+      );
+      final Map<String, dynamic> body = ApiClient.extractMap(response.data);
+      final Object? json = body['transaction'] ?? body;
+      if (json is! Map) throw Exception('Server tidak mengembalikan data transaksi.');
+      return PawnTransaction.fromApiJson(Map<String, dynamic>.from(json));
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
 }

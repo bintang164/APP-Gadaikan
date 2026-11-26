@@ -26,13 +26,35 @@ class TransactionDetailScreen extends StatefulWidget {
 
 class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   bool _isPaying = false;
+  bool _detailLoaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_detailLoaded) return;
+    _detailLoaded = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _reloadDetail();
+    });
+  }
+
+  Future<void> _reloadDetail() async {
+    try {
+      await AppStateScope.of(context).loadTransactionDetail(widget.transactionId);
+    } catch (_) {
+      // Transaksi lama tetap ditampilkan bila server sedang bermasalah.
+    }
+  }
 
   Future<void> _showDemoPaymentSheet(PawnTransaction trx) async {
+    if (_isPaying) return; // cegah double submit
     final amountCtrl = TextEditingController(
       text: trx.remainingAmount.round().toString(),
     );
-    String method = 'Transfer Bank';
+    String method = 'Transfer Bank (Simulasi)';
     final formKey = GlobalKey<FormState>();
+    int step = 0; // 0: input, 1: konfirmasi
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
@@ -54,66 +76,146 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Pembayaran Simulasi (Demo)',
-                  style: AppTextStyles.sectionHeading,
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Pembayaran Gadai',
+                        style: AppTextStyles.sectionHeading,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.warningSoft,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'SIMULASI / DEMO',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Fitur ini hanya mencatat simulasi pembayaran demo tanpa memotong saldo atau transaksi uang sungguhan.',
+                  'Tidak ada uang sungguhan yang dipotong atau ditransfer. '
+                  'Backend hanya mencatat catatan pembayaran demo.',
                   style: AppTextStyles.caption,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                TextFormField(
-                  controller: amountCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: 'Nominal Pembayaran (Rp)',
+                if (step == 0) ...[
+                  TextFormField(
+                    controller: amountCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: 'Nominal Pembayaran (Rp)',
+                      helperText:
+                          'Maksimal sesuai sisa kewajiban transaksi ini.',
+                    ),
+                    validator: (v) {
+                      final parsed = AppFormatters.parseCurrency(v ?? '');
+                      if (parsed == null || parsed <= 0) {
+                        return 'Masukkan nominal lebih dari 0';
+                      }
+                      if (parsed > trx.remainingAmount) {
+                        return 'Nominal melebihi sisa kewajiban';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (v) {
-                    final parsed = AppFormatters.parseCurrency(v ?? '');
-                    if (parsed == null || parsed <= 0) {
-                      return 'Masukkan nominal yang valid';
-                    }
-                    if (parsed > trx.remainingAmount) {
-                      return 'Nominal melebihi sisa kewajiban';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: method,
-                  decoration: const InputDecoration(
-                    labelText: 'Metode Simulasi',
+                  const SizedBox(height: AppSpacing.md),
+                  DropdownButtonFormField<String>(
+                    initialValue: method,
+                    decoration: const InputDecoration(
+                      labelText: 'Metode Simulasi',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Transfer Bank (Simulasi)',
+                        child: Text('Transfer Bank (Simulasi)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Virtual Account (Simulasi)',
+                        child: Text('Virtual Account (Simulasi)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Tunai di Outlet (Simulasi)',
+                        child: Text('Tunai di Outlet (Simulasi)'),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setSheetState(() => method = val);
+                    },
                   ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'Transfer Bank',
-                      child: Text('Transfer Bank (Simulasi)'),
+                  const SizedBox(height: AppSpacing.lg),
+                  PrimaryButton(
+                    label: 'Lanjut Konfirmasi',
+                    onPressed: () {
+                      if (!formKey.currentState!.validate()) return;
+                      setSheetState(() => step = 1);
+                    },
+                  ),
+                ] else ...[
+                  AppCard(
+                    backgroundColor: AppColors.warningSoft,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Konfirmasi Catatan Demo',
+                          style: AppTextStyles.cardTitle,
+                        ),
+                        const SizedBox(height: 8),
+                        _InfoRow(
+                          label: 'Transaksi',
+                          value: trx.code,
+                        ),
+                        _InfoRow(
+                          label: 'Nominal',
+                          value: AppFormatters.formatRupiah(
+                            AppFormatters.parseCurrency(amountCtrl.text) ?? 0,
+                          ),
+                        ),
+                        _InfoRow(label: 'Metode', value: method),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Dengan melanjutkan, kamu menyetujui pencatatan '
+                          'simulasi ini. Status lunas hanya ditetapkan backend '
+                          'setelah aturan pembayaran demo terpenuhi.',
+                          style: AppTextStyles.caption,
+                        ),
+                      ],
                     ),
-                    DropdownMenuItem(
-                      value: 'Virtual Account',
-                      child: Text('Virtual Account (Simulasi)'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Tunai di Outlet',
-                      child: Text('Tunai di Outlet (Simulasi)'),
-                    ),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setSheetState(() => method = val);
-                  },
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                PrimaryButton(
-                  label: 'Catat Pembayaran Demo',
-                  onPressed: () {
-                    if (!formKey.currentState!.validate()) return;
-                    Navigator.of(ctx).pop(true);
-                  },
-                ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SecondaryButton(
+                          label: 'Ubah',
+                          onPressed: () => setSheetState(() => step = 0),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        flex: 2,
+                        child: PrimaryButton(
+                          label: 'Konfirmasi & Catat',
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -132,10 +234,21 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
         method: method,
       );
       if (!mounted) return;
+      await _reloadDetail();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Pembayaran simulasi ${AppFormatters.formatRupiah(amount)} berhasil dicatat.',
+            'Catatan simulasi ${AppFormatters.formatRupiah(amount)} tersimpan.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.toString().replaceFirst('Exception: ', ''),
           ),
         ),
       );
@@ -173,13 +286,31 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               backgroundColor: AppColors.warningSoft,
               borderColor: AppColors.warning.withValues(alpha: 0.35),
               padding: const EdgeInsets.all(12),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: AppColors.warning, size: 18),
-                  SizedBox(width: 8),
+                  const Icon(Icons.info_outline, color: AppColors.warning, size: 18),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'SIMULASI / DEMO',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.warning,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Mode Demo: Nilai pinjaman, biaya, dan pencatatan pembayaran pada halaman ini adalah simulasi.',
+                      appState.usesBackend
+                          ? 'Pembayaran di halaman ini adalah SIMULASI/DEMO. Backend mencatat catatan demo, bukan transaksi uang sungguhan.'
+                          : 'Mode Demo: nilai pinjaman, biaya, dan pencatatan pembayaran pada halaman ini adalah simulasi lokal.',
                       style: AppTextStyles.caption,
                     ),
                   ),

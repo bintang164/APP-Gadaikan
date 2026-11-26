@@ -32,6 +32,10 @@ Tidak ada URL produksi yang di-hard-code.
   pagination (`GET /api/admin/applications`).
 - Detail admin: data nasabah sesuai hak akses, data barang, dokumen privat
   via endpoint terotorisasi, catatan internal, riwayat status.
+- Penaksiran: nilai taksiran, persentase plafon, nominal disetujui, tenor,
+  biaya, tanggal mulai/jatuh tempo, dan catatan nasabah. Validasi nominal
+  tidak negatif, konsisten, dan tanggal tertib. Backend menyimpan actor &
+  timestamp; tarif tidak disebut resmi bila belum ada kebijakan.
 - Aksi: minta revisi, proses pemeriksaan, setujui, tolak. Alasan wajib
   diisi untuk revisi dan penolakan.
 
@@ -45,6 +49,8 @@ wajib dilindungi middleware peran di Laravel:
 - `GET /api/admin/applications`
 - `GET /api/admin/applications/{id}?include=status_history`
 - `GET /api/admin/applications/{id}/documents/{docId}` (privat)
+- `POST /api/admin/applications/{id}/assessment`
+  `{assessed_value, plafon_percentage, approved_principal, tenor_days, service_fee, start_date, due_date, customer_note, internal_note}`
 - `POST /api/admin/applications/{id}/request-revision` `{reason, internal_note}`
 - `POST /api/admin/applications/{id}/review`
 - `POST /api/admin/applications/{id}/decision`

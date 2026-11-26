@@ -296,8 +296,24 @@ function renderDetail(app) {
     <div class="actions">
       <button class="btn" data-action="revision" ${disabled}>Minta Revisi</button>
       <button class="btn" data-action="review" ${disabled}>Proses Pemeriksaan</button>
-      <button class="btn primary" data-action="approve" ${disabled}>Setujui</button>
+      <button class="btn" data-action="assessment" ${disabled}>Input Penaksiran</button>
+      <button class="btn primary" data-action="approve" ${disabled}>Setujui Penawaran</button>
       <button class="btn danger" data-action="reject" ${disabled}>Tolak</button>
+    </div>
+    <div id="assessmentForm" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+      <h3>Form Penaksiran (Backend yang menyimpan)</h3>
+      <div class="detail-grid">
+        <label><span>Nilai taksiran barang (Rp)</span><input id="assessedValue" type="number" min="0" step="1000" /></label>
+        <label><span>Persentase plafon (%)</span><input id="plafonPercent" type="number" min="0" max="100" step="1" value="80" /></label>
+        <label><span>Nominal pinjaman disetujui (Rp)</span><input id="approvedPrincipal" type="number" min="0" step="1000" /></label>
+        <label><span>Tenor (hari)</span><input id="tenorDays" type="number" min="1" step="1" value="30" /></label>
+        <label><span>Biaya layanan (Rp)</span><input id="serviceFee" type="number" min="0" step="1000" /></label>
+        <label><span>Tanggal mulai</span><input id="startDate" type="date" /></label>
+        <label><span>Tanggal jatuh tempo</span><input id="dueDate" type="date" /></label>
+      </div>
+      <label style="margin-top:10px"><span>Catatan untuk nasabah</span><textarea id="customerNote" placeholder="Ringkasan penaksiran yang boleh dilihat nasabah"></textarea></label>
+      <p class="hint">Tarif dan persentase di form ini bukan tarif resmi bila belum ditetapkan kebijakan bisnis. Backend mencatat actor dan timestamp.</p>
+      <div class="row"><button id="saveAssessment" class="btn primary" ${disabled}>Simpan Penaksiran</button></div>
     </div>
     <p class="hint">Setiap perubahan status dicatat di backend beserta aktor. Panel ini tidak mengubah status secara lokal.</p>
   `;
@@ -308,8 +324,35 @@ function bindDetailEvents() {
     button.addEventListener('click', () => viewDocument(button.dataset.doc));
   });
   $('detailBody').querySelectorAll('[data-action]').forEach((button) => {
-    button.addEventListener('click', () => performAction(button.dataset.action));
+    button.addEventListener('click', () => {
+      if (button.dataset.action === 'assessment') {
+        const form = $('assessmentForm');
+        form.hidden = !form.hidden;
+        return;
+      }
+      performAction(button.dataset.action);
+    });
   });
+  const saveButton = $('saveAssessment');
+  if (saveButton) saveButton.addEventListener('click', performAssessment);
+
+  const assessed = $('assessedValue');
+  const percent = $('plafonPercent');
+  const approved = $('approvedPrincipal');
+  if (assessed && percent && approved) {
+    const recalc = () => {
+      const value = (Number(assessed.value) || 0) * (Number(percent.value) || 0) / 100;
+      approved.value = String(Math.round(value));
+    };
+    assessed.addEventListener('input', recalc);
+    percent.addEventListener('input', recalc);
+    if (!$('startDate').value) $('startDate').value = new Date().toISOString().slice(0, 10);
+    if (!$('dueDate').value) {
+      const due = new Date();
+      due.setDate(due.getDate() + (Number($('tenorDays').value) || 30));
+      $('dueDate').value = due.toISOString().slice(0, 10);
+    }
+  }
 }
 
 async function viewDocument(docId) {
@@ -360,6 +403,55 @@ async function performAction(type) {
       body,
     });
     toast(action.label);
+    await loadAll();
+    await openDetail(state.detail.id);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function performAssessment() {
+  const assessed = Number($('assessedValue').value);
+  const percent = Number($('plafonPercent').value);
+  const principal = Number($('approvedPrincipal').value);
+  const tenor = Number($('tenorDays').value);
+  const fee = Number($('serviceFee').value);
+  const start = $('startDate').value;
+  const due = $('dueDate').value;
+
+  if (!Number.isFinite(assessed) || assessed < 0 ||
+      !Number.isFinite(principal) || principal < 0 ||
+      !Number.isFinite(fee) || fee < 0 ||
+      !Number.isFinite(tenor) || tenor < 1) {
+    toast('Nominal tidak boleh negatif dan tenor minimal 1 hari.');
+    return;
+  }
+  if (percent < 0 || percent > 100) { toast('Persentase plafon 0–100.'); return; }
+  if (principal > assessed && assessed > 0) {
+    toast('Nominal pinjaman tidak boleh melebihi nilai taksiran.');
+    return;
+  }
+  if (!start || !due || due < start) {
+    toast('Tanggal mulai dan jatuh tempo harus valid.');
+    return;
+  }
+
+  try {
+    await api(`/admin/applications/${encodeURIComponent(state.detail.id)}/assessment`, {
+      method: 'POST',
+      body: {
+        assessed_value: assessed,
+        plafon_percentage: percent,
+        approved_principal: principal,
+        tenor_days: tenor,
+        service_fee: fee,
+        start_date: start,
+        due_date: due,
+        customer_note: $('customerNote').value.trim(),
+        internal_note: $('internalNote').value.trim(),
+      },
+    });
+    toast('Penaksiran tersimpan di backend.');
     await loadAll();
     await openDetail(state.detail.id);
   } catch (error) {

@@ -51,6 +51,7 @@ abstract class GadaikanRepository {
   Future<PawnApplication> declineOffer(String applicationId);
 
   Future<List<PawnTransaction>> getTransactions();
+  Future<PawnTransaction> getTransactionDetail(String id);
   Future<PawnTransaction> recordDemoPayment({
     required String transactionId,
     required double amount,
@@ -647,6 +648,15 @@ class MockGadaikanRepository implements GadaikanRepository {
   Future<List<PawnTransaction>> getTransactions() async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     return List<PawnTransaction>.unmodifiable(_transactions);
+  }
+
+  @override
+  Future<PawnTransaction> getTransactionDetail(String id) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    return _transactions.firstWhere(
+      (PawnTransaction trx) => trx.id == id,
+      orElse: () => throw Exception('Transaksi tidak ditemukan.'),
+    );
   }
 
   @override

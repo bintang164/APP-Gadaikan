@@ -102,6 +102,22 @@ class AppState extends ChangeNotifier {
     return detail;
   }
 
+  /// Memuat ulang transaksi dari server agar riwayat pembayaran segar.
+  Future<PawnTransaction> loadTransactionDetail(String id) async {
+    final PawnTransaction detail = await _repository.getTransactionDetail(id);
+    final int index =
+        _transactions.indexWhere((PawnTransaction trx) => trx.id == id);
+    if (index == -1) {
+      _transactions = <PawnTransaction>[detail, ..._transactions];
+    } else {
+      final List<PawnTransaction> updated = List<PawnTransaction>.from(_transactions);
+      updated[index] = detail;
+      _transactions = updated;
+    }
+    notifyListeners();
+    return detail;
+  }
+
   Future<void> setApplicationFilter(String status) async {
     await loadApplicationsPage(status: status, page: 1);
   }
