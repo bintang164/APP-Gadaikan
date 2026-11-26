@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gadaikan — Panel Admin</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">GADAI<span>KAN</span></span>
+        <span class="brand-sub">Panel Admin</span>
+      </div>
+      <div class="topbar-right">
+        <span id="modeLabel" class="pill">Mode demo</span>
+        <span id="actorLabel" class="muted"></span>
+        <button id="logoutBtn" class="btn ghost" hidden>Keluar</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="config card">
+        <h2>Koneksi Backend</h2>
+        <div class="grid config-grid">
+          <label>
+            <span>API base URL</span>
+            <input id="baseUrl" type="url" placeholder="http://127.0.0.1:8000/api" />
+          </label>
+          <label>
+            <span>Mode</span>
+            <select id="modeSelect">
+              <option value="demo">Demo (data contoh, aksi nonaktif)</option>
+              <option value="api">Laravel API (mbutuhkan peran admin)</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint">
+          URL tidak disimpan di kode. Nilai tersimpan di browser ini saja.
+          Semua endpoint admin memakai Bearer token dan middleware peran.
+        </p>
+      </section>
+
+      <section id="loginCard" class="card" hidden>
+        <h2>Masuk Admin</h2>
+        <div class="grid">
+          <label><span>Nomor HP / email</span><input id="adminIdentifier" autocomplete="username" /></label>
+          <label><span>Kata sandi</span><input id="adminPassword" type="password" autocomplete="current-password" /></label>
+        </div>
+        <div class="row">
+          <button id="loginBtn" class="btn primary">Masuk</button>
+          <span id="loginMessage" class="muted"></span>
+        </div>
+      </section>
+
+      <section id="dashboard" class="card">
+        <div class="section-head">
+          <h2>Ringkasan</h2>
+          <button id="refreshBtn" class="btn ghost">Muat ulang</button>
+        </div>
+        <div id="stats" class="stats"></div>
+        <p id="dashboardNote" class="hint"></p>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <h2>Daftar Pengajuan</h2>
+          <span id="listMeta" class="muted"></span>
+        </div>
+        <div class="grid filters">
+          <label><span>Cari nomor / nama</span><input id="searchInput" placeholder="GDK-2026-0001 atau nama" /></label>
+          <label><span>Status</span><select id="statusFilter">
+            <option value="">Semua</option>
+            <option value="submitted">Menunggu</option>
+            <option value="under_review">Diproses</option>
+            <option value="revision_required">Perlu Perbaikan</option>
+            <option value="approved">Disetujui</option>
+            <option value="rejected">Ditolak</option>
+          </select></label>
+          <label><span>Kategori</span><select id="categoryFilter">
+            <option value="">Semua</option>
+            <option value="elektronik">Elektronik</option>
+            <option value="emas">Emas</option>
+            <option value="bpkb">BPKB</option>
+          </select></label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Nomor</th><th>Nasabah</th><th>Kategori</th><th>Status</th><th>Tanggal</th><th></th></tr>
+            </thead>
+            <tbody id="applicationsBody"></tbody>
+          </table>
+        </div>
+        <div class="row pagination">
+          <button id="prevPage" class="btn ghost">Sebelumnya</button>
+          <span id="pageLabel" class="muted">Halaman 1</span>
+          <button id="nextPage" class="btn ghost">Berikutnya</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="detailOverlay" class="overlay" hidden>
+      <div class="modal card" role="dialog" aria-modal="true" aria-label="Detail pengajuan">
+        <div class="section-head">
+          <h2 id="detailTitle">Detail Pengajuan</h2>
+          <button id="closeDetail" class="btn ghost">Tutup</button>
+        </div>
+        <div id="detailBody"></div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+    <script src="app.js"></script>
+  </body>
+</html>

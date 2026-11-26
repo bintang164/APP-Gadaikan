@@ -34,6 +34,27 @@ class ApiGadaikanRepository extends MockGadaikanRepository {
   }
 
   @override
+  Future<PawnApplication> getApplicationDetail(String id) async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.get<dynamic>(
+        '$applicationsPath/$id',
+        queryParameters: <String, dynamic>{'include': 'status_history'},
+        options: Options(headers: await _headers()),
+      );
+      final Map<String, dynamic> body = ApiClient.extractMap(response.data);
+      final Object? applicationJson = body['application'] ?? body;
+      if (applicationJson is! Map) {
+        throw Exception('Detail pengajuan tidak tersedia dari server.');
+      }
+      return PawnApplication.fromApiJson(
+        Map<String, dynamic>.from(applicationJson),
+      );
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
   Future<List<PawnApplication>> getApplications() async {
     final PagedApplications page =
         await getApplicationsPage(status: null, page: 1, perPage: 50);

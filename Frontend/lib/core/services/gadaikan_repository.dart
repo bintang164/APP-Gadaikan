@@ -20,6 +20,9 @@ abstract class GadaikanRepository {
   Future<List<PawnCategoryInfo>> getCategories();
   Future<List<PawnApplication>> getApplications();
 
+  /// Detail terbaru satu pengajuan (termasuk riwayat status dari server).
+  Future<PawnApplication> getApplicationDetail(String id);
+
   /// True bila data berasal dari backend (bukan mode demo lokal).
   bool get usesBackend;
 
@@ -46,11 +49,6 @@ abstract class GadaikanRepository {
   });
   Future<PawnTransaction> acceptOffer(String applicationId);
   Future<PawnApplication> declineOffer(String applicationId);
-  Future<PawnApplication> simulateReviewDecision({
-    required String applicationId,
-    required ApplicationStatus nextStatus,
-    String? note,
-  });
 
   Future<List<PawnTransaction>> getTransactions();
   Future<PawnTransaction> recordDemoPayment({
@@ -441,6 +439,15 @@ class MockGadaikanRepository implements GadaikanRepository {
   bool get usesBackend => false;
 
   @override
+  Future<PawnApplication> getApplicationDetail(String id) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    return _applications.firstWhere(
+      (PawnApplication app) => app.id == id,
+      orElse: () => throw Exception('Pengajuan tidak ditemukan.'),
+    );
+  }
+
+  @override
   Future<List<PawnApplication>> getApplications() async {
     await Future<void>.delayed(const Duration(milliseconds: 350));
     return List<PawnApplication>.unmodifiable(_applications);
@@ -558,62 +565,6 @@ class MockGadaikanRepository implements GadaikanRepository {
           status: ApplicationStatus.underReview,
           title: 'Perbaikan Dikirim',
           note: 'Nasabah memperbarui data/berkas dan pengajuan ditinjau ulang.',
-          timestamp: now,
-        ),
-      ],
-    );
-    _applications[index] = updated;
-    return updated;
-  }
-
-  @override
-  Future<PawnApplication> simulateReviewDecision({
-    required String applicationId,
-    required ApplicationStatus nextStatus,
-    String? note,
-  }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    final index = _applications.indexWhere((a) => a.id == applicationId);
-    if (index == -1) throw Exception('Pengajuan tidak ditemukan.');
-    final now = DateTime.now();
-    final current = _applications[index];
-
-    PawnAssessment? assessment = current.assessment;
-    if (nextStatus == ApplicationStatus.approved && assessment == null) {
-      final baseVal = current.estimatedUserValue ?? 5000000;
-      final tenor = current.preferredTenorDays ?? 30;
-      final sim = _config.calculate(
-        category: current.category,
-        estimatedValue: baseVal,
-        tenorDays: tenor,
-      );
-      assessment = PawnAssessment(
-        assessedValue: baseVal * 0.95,
-        approvedPrincipal: sim.estimatedPrincipal,
-        serviceFee: sim.estimatedFee,
-        tenorDays: tenor,
-        startDate: now,
-        dueDate: now.add(Duration(days: tenor)),
-        notes: note ?? 'Hasil penaksiran simulasi demo.',
-      );
-    }
-
-    final updated = current.copyWith(
-      status: nextStatus,
-      adminNote: note ??
-          (nextStatus == ApplicationStatus.approved
-              ? 'Penaksiran selesai (simulasi demo). Silakan tinjau penawaran.'
-              : nextStatus == ApplicationStatus.revisionRequired
-                  ? 'Mohon lengkapi foto atau keterangan barang.'
-                  : 'Pengajuan sedang diperiksa petugas.'),
-      assessment: assessment,
-      updatedAt: now,
-      statusHistory: [
-        ...current.statusHistory,
-        ApplicationStatusHistory(
-          status: nextStatus,
-          title: nextStatus.label,
-          note: note ?? 'Status diperbarui melalui simulasi pemeriksaan.',
           timestamp: now,
         ),
       ],

@@ -429,6 +429,29 @@ class PawnApplication {
       preferredTenorDays: json['preferred_tenor_days'] is num
           ? (json['preferred_tenor_days'] as num).toInt()
           : null,
+      adminNote: json['admin_note']?.toString(),
+      assessment: json['assessment'] is Map
+          ? _assessmentFromApi(Map<String, dynamic>.from(json['assessment'] as Map))
+          : null,
+    );
+  }
+
+  static PawnAssessment _assessmentFromApi(Map<String, dynamic> json) {
+    final DateTime now = DateTime.now();
+    return PawnAssessment(
+      assessedValue: (json['assessed_value'] is num)
+          ? (json['assessed_value'] as num).toDouble()
+          : 0,
+      approvedPrincipal: (json['approved_principal'] is num)
+          ? (json['approved_principal'] as num).toDouble()
+          : 0,
+      serviceFee: (json['service_fee'] is num)
+          ? (json['service_fee'] as num).toDouble()
+          : 0,
+      tenorDays: json['tenor_days'] is num ? (json['tenor_days'] as num).toInt() : 0,
+      startDate: DateTime.tryParse('${json['start_date'] ?? ''}') ?? now,
+      dueDate: DateTime.tryParse('${json['due_date'] ?? ''}') ?? now,
+      notes: json['notes']?.toString(),
     );
   }
 

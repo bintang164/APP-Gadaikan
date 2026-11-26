@@ -28,6 +28,26 @@ class ApplicationDetailScreen extends StatefulWidget {
 
 class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
   bool _isProcessing = false;
+  bool _detailLoaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_detailLoaded) return;
+    _detailLoaded = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _reloadDetail();
+    });
+  }
+
+  Future<void> _reloadDetail() async {
+    try {
+      await AppStateScope.of(context).loadApplicationDetail(widget.applicationId);
+    } catch (_) {
+      // Detail lama tetap ditampilkan bila server sedang bermasalah.
+    }
+  }
 
   Future<void> _acceptOffer(PawnApplication app) async {
     final confirmed = await showDialog<bool>(
@@ -99,27 +119,6 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Penawaran ditolak.')),
-      );
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _simulateAdminAction(
-    PawnApplication app,
-    ApplicationStatus nextStatus,
-  ) async {
-    setState(() => _isProcessing = true);
-    try {
-      await AppStateScope.of(context).simulateReviewDecision(
-        applicationId: app.id,
-        nextStatus: nextStatus,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Simulasi status diubah ke "${nextStatus.label}".'),
-        ),
       );
     } finally {
       if (mounted) setState(() => _isProcessing = false);
@@ -219,6 +218,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
                   ),
                 ),
               ],
+              _buildStatusInfoCard(app),
               if (app.status == ApplicationStatus.revisionRequired) ...[
                 const SizedBox(height: AppSpacing.md),
                 PrimaryButton(
@@ -366,56 +366,89 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
                   ],
                 ),
               ),
-              if (app.status == ApplicationStatus.submitted ||
-                  app.status == ApplicationStatus.underReview) ...[
-                const SizedBox(height: AppSpacing.lg),
-                AppCard(
-                  backgroundColor: AppColors.accentGoldSoft,
-                  borderColor: AppColors.accentGold.withValues(alpha: 0.45),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Simulasi Pemeriksaan Petugas (Mode Demo Frontend)',
-                        style: AppTextStyles.cardTitle,
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Karena backend Laravel belum dihubungkan, Anda dapat menguji transisi status dari sini.',
-                        style: AppTextStyles.caption,
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          OutlinedButton(
-                            onPressed: _isProcessing
-                                ? null
-                                : () => _simulateAdminAction(
-                                      app,
-                                      ApplicationStatus.approved,
-                                    ),
-                            child: const Text('Simulasikan Disetujui'),
-                          ),
-                          OutlinedButton(
-                            onPressed: _isProcessing
-                                ? null
-                                : () => _simulateAdminAction(
-                                      app,
-                                      ApplicationStatus.revisionRequired,
-                                    ),
-                            child: const Text('Minta Perbaikan'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
               const SizedBox(height: AppSpacing.lg),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusInfoCard(PawnApplication app) {
+    final String title;
+    final String message;
+    final Color background;
+    final Color border;
+    final IconData icon;
+
+    switch (app.status) {
+      case ApplicationStatus.revisionRequired:
+        title = 'Perlu Perbaikan Data';
+        message = 'Petugas memerlukan tambahan data atau foto yang lebih jelas. '
+            'Perbaiki pengajuan lalu kirim kembali.';
+        background = AppColors.warningSoft;
+        border = AppColors.warning;
+        icon = Icons.edit_note_rounded;
+      case ApplicationStatus.approved:
+        title = 'Penawaran Siap Ditinjau';
+        message = 'Penawaran di bawah adalah hasil pemeriksaan. Terima atau tolak '
+            'penawaran untuk melanjutkan. Nilai final tercatat di server.';
+        background = AppColors.successSoft;
+        border = AppColors.success;
+        icon = Icons.check_circle_outline_rounded;
+      case ApplicationStatus.rejected:
+        title = 'Pengajuan Belum Disetujui';
+        message = 'Pengajuan ini tidak dapat dilanjutkan. Silakan periksa kembali '
+            'data dan persyaratan, lalu ajukan kembali bila memungkinkan. '
+            'Untuk informasi lebih lanjut, hubungi outlet terdekat.';
+        background = AppColors.dangerSoft;
+        border = AppColors.danger;
+        icon = Icons.info_outline_rounded;
+      case ApplicationStatus.underReview:
+      case ApplicationStatus.submitted:
+        title = 'Sedang Diproses';
+        message = 'Pengajuan sedang diperiksa petugas. Perubahan status berikutnya '
+            'dicatat oleh backend dan akan muncul pada timeline ini.';
+        background = AppColors.infoSoft;
+        border = AppColors.info;
+        icon = Icons.schedule_rounded;
+      default:
+        title = 'Informasi Pengajuan';
+        message = 'Status pengajuan: ${app.status.label}. Semua perubahan status '
+            'divalidasi oleh backend, bukan dari aplikasi nasabah.';
+        background = AppColors.primarySoft;
+        border = AppColors.primary;
+        icon = Icons.info_outline_rounded;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: AppCard(
+        backgroundColor: background,
+        borderColor: border.withValues(alpha: 0.35),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: border, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTextStyles.cardTitle),
+                  const SizedBox(height: 4),
+                  Text(message, style: AppTextStyles.caption),
+                  const SizedBox(height: 6),
+                  Text(
+                    AppStateScope.of(context).usesBackend
+                        ? 'Sumber status: server Laravel.'
+                        : 'Mode demo: status dan timeline berasal dari data lokal.',
+                    style: AppTextStyles.caption.copyWith(color: border),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

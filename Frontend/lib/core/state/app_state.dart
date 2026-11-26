@@ -43,6 +43,7 @@ class AppState extends ChangeNotifier {
   List<FaqItem> get faqs => _faqs;
   bool get isLoadingData => _isLoadingData;
   String? get dataError => _dataError;
+  bool get usesBackend => _repository.usesBackend;
 
   int get unreadNotificationCount =>
       _notifications.where((n) => !n.isRead).length;
@@ -84,6 +85,21 @@ class AppState extends ChangeNotifier {
       _isLoadingApplications = false;
       notifyListeners();
     }
+  }
+
+  /// Memuat ulang satu pengajuan dari server agar timeline/status segar.
+  Future<PawnApplication> loadApplicationDetail(String id) async {
+    final PawnApplication detail = await _repository.getApplicationDetail(id);
+    final int index = _applications.indexWhere((PawnApplication app) => app.id == id);
+    if (index == -1) {
+      _applications = <PawnApplication>[detail, ..._applications];
+    } else {
+      final List<PawnApplication> updated = List<PawnApplication>.from(_applications);
+      updated[index] = detail;
+      _applications = updated;
+    }
+    notifyListeners();
+    return detail;
   }
 
   Future<void> setApplicationFilter(String status) async {
@@ -215,21 +231,6 @@ class AppState extends ChangeNotifier {
       itemTitle: itemTitle,
       itemDetails: itemDetails,
       documents: documents,
-    );
-    _applications = await _repository.getApplications();
-    notifyListeners();
-    return updated;
-  }
-
-  Future<PawnApplication> simulateReviewDecision({
-    required String applicationId,
-    required ApplicationStatus nextStatus,
-    String? note,
-  }) async {
-    final updated = await _repository.simulateReviewDecision(
-      applicationId: applicationId,
-      nextStatus: nextStatus,
-      note: note,
     );
     _applications = await _repository.getApplications();
     notifyListeners();
