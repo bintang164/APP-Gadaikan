@@ -17,6 +17,7 @@ abstract class GadaikanRepository {
   Future<UserProfile> updateProfile(UserProfile profile);
 
   Future<SimulationConfig> getSimulationConfig();
+  Future<List<PawnCategoryInfo>> getCategories();
   Future<List<PawnApplication>> getApplications();
   Future<PawnApplication> submitApplication({
     required PawnCategory category,
@@ -405,6 +406,23 @@ class MockGadaikanRepository implements GadaikanRepository {
   Future<SimulationConfig> getSimulationConfig() async {
     await Future<void>.delayed(const Duration(milliseconds: 200));
     return _config;
+  }
+
+  @override
+  Future<List<PawnCategoryInfo>> getCategories() async {
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    // Data demo berlabel; implementasi API tinggal mengganti method ini.
+    return PawnCategory.values
+        .map(
+          (PawnCategory category) => PawnCategoryInfo(
+            category: category,
+            name: category.label,
+            description: category.shortSubtitle,
+            requirements: category.requirements,
+            isDemo: true,
+          ),
+        )
+        .toList(growable: false);
   }
 
   @override

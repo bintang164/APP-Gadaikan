@@ -10,6 +10,7 @@ class AppState extends ChangeNotifier {
 
   UserProfile? _user;
   SimulationConfig? _simulationConfig;
+  List<PawnCategoryInfo> _categories = const [];
   List<PawnApplication> _applications = const [];
   List<PawnTransaction> _transactions = const [];
   List<OutletInfo> _outlets = const [];
@@ -25,6 +26,7 @@ class AppState extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
   bool get hasSeenOnboarding => _hasSeenOnboarding;
   SimulationConfig? get simulationConfig => _simulationConfig;
+  List<PawnCategoryInfo> get categories => _categories;
   List<PawnApplication> get applications => _applications;
   List<PawnTransaction> get transactions => _transactions;
   List<OutletInfo> get outlets => _outlets;
@@ -48,6 +50,7 @@ class AppState extends ChangeNotifier {
   Future<bool> initialize() async {
     _user = await _repository.restoreSession();
     _simulationConfig = await _repository.getSimulationConfig();
+    _categories = await _repository.getCategories();
     if (_user != null) {
       await refreshAllData();
     }
@@ -102,6 +105,7 @@ class AppState extends ChangeNotifier {
       final results = await Future.wait([
         _repository.getSimulationConfig(),
         _repository.getApplications(),
+        _repository.getCategories(),
         _repository.getTransactions(),
         _repository.getOutlets(),
         _repository.getPromotions(),
@@ -110,11 +114,12 @@ class AppState extends ChangeNotifier {
       ]);
       _simulationConfig = results[0] as SimulationConfig;
       _applications = results[1] as List<PawnApplication>;
-      _transactions = results[2] as List<PawnTransaction>;
-      _outlets = results[3] as List<OutletInfo>;
-      _promotions = results[4] as List<PromoInfo>;
-      _notifications = results[5] as List<AppNotification>;
-      _faqs = results[6] as List<FaqItem>;
+      _categories = results[2] as List<PawnCategoryInfo>;
+      _transactions = results[3] as List<PawnTransaction>;
+      _outlets = results[4] as List<OutletInfo>;
+      _promotions = results[5] as List<PromoInfo>;
+      _notifications = results[6] as List<AppNotification>;
+      _faqs = results[7] as List<FaqItem>;
     } catch (e) {
       _dataError = e.toString().replaceFirst('Exception: ', '');
     } finally {

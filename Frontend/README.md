@@ -3,9 +3,10 @@
 Aplikasi pengajuan gadai digital untuk prototipe akademik. Dibangun dengan
 Flutter (Android) dan disiapkan untuk backend Laravel REST API.
 
-> **Status:** Prompt 01–04 selesai: design system, splash & onboarding,
-> login/register/autentikasi, dan Home Dashboard. Backend Laravel dan
-> beberapa fitur lanjutan masih memakai mode demo berlabel.
+> **Status:** Prompt 01–06 selesai: design system, splash & onboarding,
+> login/register/autentikasi, Home Dashboard, pemilihan kategori, dan
+> form pengajuan elektronik bertahap. Backend Laravel dan fitur lanjutan
+> masih memakai mode demo berlabel.
 
 ## Fitur yang sudah berjalan
 
@@ -28,6 +29,13 @@ Flutter (Android) dan disiapkan untuk backend Laravel REST API.
 - Kategori membuka form pengajuan; simulasi membuka kalkulator dengan
   disclaimer; pengajuan terakhir membuka detail.
 - Loading, error dengan **Coba lagi**, dan empty state tersedia.
+- **Pilih kategori**: tiga kartu dengan indikator terpilih, persyaratan
+  kategori ditampilkan sebelum form, tombol Lanjut nonaktif tanpa kategori,
+  serta penjelasan bahwa pengajuan tetap perlu pemeriksaan & persetujuan.
+- **Form elektronik bertahap**: Identitas Perangkat → Kondisi &
+  Kelengkapan → Unggah Berkas → Tinjau & Kirim. Chips untuk pilihan
+  terstruktur, helper text, validasi, draf lokal, dan tombol Lanjut aktif
+  hanya bila field wajib valid. Tidak ada taksiran harga otomatis.
 - Form pengajuan per kategori, upload dokumen, riwayat, detail
   transaksi, outlet, promo, notifikasi, dan FAQ (mode demo berlabel).
 - Theme terpusat Navy Blue + Gold dengan komponen reusable.
@@ -122,7 +130,7 @@ flutter build apk --debug
 Status terakhir:
 
 - `flutter analyze`: tidak ada issue.
-- `flutter test`: **8 test lulus** (auth + widget).
+- `flutter test`: **11 test lulus** (auth + kategori/form + widget).
 - `flutter build web --release`: berhasil.
 - `flutter build apk --debug`: berhasil.
 

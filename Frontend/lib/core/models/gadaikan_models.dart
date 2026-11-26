@@ -23,6 +23,74 @@ enum PawnCategory {
         PawnCategory.emas => Icons.diamond_outlined,
         PawnCategory.bpkb => Icons.directions_car_outlined,
       };
+
+  /// ID stabil untuk API dan draft lokal.
+  String get apiId => name;
+
+  static PawnCategory? fromId(String? id) {
+    if (id == null) return null;
+    for (final PawnCategory category in PawnCategory.values) {
+      if (category.apiId == id) return category;
+    }
+    return null;
+  }
+
+  /// Persyaratan yang ditampilkan sebelum form dimulai.
+  List<String> get requirements => switch (this) {
+        PawnCategory.elektronik => const [
+            'Jenis, merek, dan model perangkat',
+            'Kondisi fisik dan fungsi perangkat',
+            'Kelengkapan (charger, dus, aksesori)',
+            'Foto barang dari beberapa sisi',
+          ],
+        PawnCategory.emas => const [
+            'Jenis emas/perhiasan dan perkiraan berat',
+            'Kadar/karat bila diketahui',
+            'Foto barang dengan pencahayaan jelas',
+            'Bukti pembelian/sertifikat bila tersedia',
+          ],
+        PawnCategory.bpkb => const [
+            'Jenis kendaraan, merek/model, dan tahun',
+            'Nomor polisi serta nama pemilik sesuai dokumen',
+            'Foto BPKB dan dokumen pendukung',
+            'Foto kendaraan tampak depan/samping',
+          ],
+      };
+}
+
+/// Kategori gadai dari API (atau mock berlabel). Ikon dipetakan dari [category]
+/// agar tidak bergantung pada aset/icon dari backend.
+class PawnCategoryInfo {
+  const PawnCategoryInfo({
+    required this.category,
+    required this.name,
+    required this.description,
+    required this.requirements,
+    this.isDemo = false,
+  });
+
+  final PawnCategory category;
+  final String name;
+  final String description;
+  final List<String> requirements;
+  final bool isDemo;
+
+  factory PawnCategoryInfo.fromJson(Map<String, dynamic> json) {
+    final String id = '${json['id'] ?? json['code'] ?? ''}';
+    final PawnCategory category =
+        PawnCategory.fromId(id) ?? PawnCategory.elektronik;
+    final Object? rawRequirements = json['requirements'];
+    final List<String> requirements = rawRequirements is List
+        ? rawRequirements.map((Object? item) => '$item').toList()
+        : category.requirements;
+    return PawnCategoryInfo(
+      category: category,
+      name: '${json['name'] ?? json['label'] ?? category.label}',
+      description: '${json['description'] ?? category.shortSubtitle}',
+      requirements: requirements,
+      isDemo: json['is_demo'] == true,
+    );
+  }
 }
 
 enum ApplicationStatus {

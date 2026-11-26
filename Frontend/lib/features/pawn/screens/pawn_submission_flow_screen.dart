@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/storage/pawn_draft_store.dart';
 import '../../../core/widgets/app_buttons.dart';
 import '../../../core/widgets/app_cards.dart';
 import '../../../core/widgets/app_text_fields.dart';
@@ -33,9 +34,11 @@ class PawnSubmissionFlowScreen extends StatefulWidget {
 
 class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
   final _step1FormKey = GlobalKey<FormState>();
+  final _identityFormKey = GlobalKey<FormState>();
+  final _conditionFormKey = GlobalKey<FormState>();
 
   late final PawnCategory _category;
-  int _stepIndex = 0; // 0: Form, 1: Upload, 2: Review
+  int _stepIndex = 0;
   bool _isSubmitting = false;
   bool _truthConfirmed = false;
   bool _showTruthError = false;
@@ -68,11 +71,26 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
   final _plateCtrl = TextEditingController();
   final _ownerNameCtrl = TextEditingController();
 
+  // Pilihan terstruktur untuk form elektronik.
+  String? _deviceTypeChoice;
+  String? _physicalChoice;
+  String? _functionChoice;
+  List<String> _accessories = <String>[];
+
   // Uploaded documents keyed by slot id
   final Map<String, PawnDocument> _uploadedDocs = {};
   PawnApplication? _submittedApp;
+  final PawnDraftStore _draftStore = PawnDraftStore();
 
   bool get _isRevisionMode => widget.existingApplication != null;
+
+  int get _uploadStep => _category == PawnCategory.elektronik ? 2 : 1;
+  int get _reviewStep => _category == PawnCategory.elektronik ? 3 : 2;
+  int get _stepCount => _category == PawnCategory.elektronik ? 4 : 3;
+
+  List<String> get _stepTitles => _category == PawnCategory.elektronik
+      ? const ['Identitas Perangkat', 'Kondisi & Kelengkapan', 'Unggah Berkas', 'Tinjau & Kirim']
+      : const ['Data Barang', 'Unggah Berkas', 'Tinjau & Kirim'];
 
   @override
   void initState() {
@@ -116,6 +134,94 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
           _plateCtrl.text = d['Nomor Polisi'] ?? '';
           _ownerNameCtrl.text = d['Nama Pemilik Dokumen'] ?? '';
       }
+    } else {
+      _loadDraft();
+    }
+  }
+
+  Future<void> _loadDraft() async {
+    try {
+      final PawnDraft? draft = await _draftStore.read();
+      if (!mounted || draft == null) return;
+      if (draft.categoryId != null &&
+          draft.categoryId != _category.apiId) {
+        return;
+      }
+      _estimatedValueCtrl.text = draft.text('estimatedValue') ?? '';
+      _notesCtrl.text = draft.text('notes') ?? '';
+
+      if (_category == PawnCategory.elektronik) {
+        _deviceTypeChoice = draft.text('deviceTypeChoice');
+        _physicalChoice = draft.text('physicalChoice');
+        _functionChoice = draft.text('functionChoice');
+        _accessories = draft.list('accessories');
+        _deviceTypeCtrl.text = draft.text('deviceType') ?? '';
+        _brandCtrl.text = draft.text('brand') ?? '';
+        _modelCtrl.text = draft.text('model') ?? '';
+        _purchaseYearCtrl.text = draft.text('purchaseYear') ?? '';
+        _physicalCondCtrl.text = draft.text('physicalCondition') ?? '';
+        _funcCondCtrl.text = draft.text('functionCondition') ?? '';
+        _accessoriesCtrl.text = draft.text('accessoriesText') ?? '';
+        _serialCtrl.text = draft.text('serial') ?? '';
+      } else {
+        _goldTypeCtrl.text = draft.text('goldType') ?? '';
+        _karatCtrl.text = draft.text('karat') ?? '';
+        _weightCtrl.text = draft.text('weight') ?? '';
+        _goldCondCtrl.text = draft.text('goldCondition') ?? '';
+        _vehicleTypeCtrl.text = draft.text('vehicleType') ?? '';
+        _vehicleBrandModelCtrl.text = draft.text('vehicleBrandModel') ?? '';
+        _vehicleYearCtrl.text = draft.text('vehicleYear') ?? '';
+        _plateCtrl.text = draft.text('plate') ?? '';
+        _ownerNameCtrl.text = draft.text('ownerName') ?? '';
+      }
+      setState(() {});
+    } catch (_) {
+      // Draft lokal opsional; gagal membaca tidak menghalangi form.
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    if (_isRevisionMode) return;
+    final Map<String, dynamic> data = <String, dynamic>{
+      'estimatedValue': _estimatedValueCtrl.text,
+      'notes': _notesCtrl.text,
+      if (_category == PawnCategory.elektronik)
+        'deviceType': _deviceTypeCtrl.text
+      else
+        'goldType': _goldTypeCtrl.text,
+    };
+    if (_category == PawnCategory.elektronik) {
+      data.addAll(<String, dynamic>{
+        'deviceTypeChoice': _deviceTypeChoice,
+        'physicalChoice': _physicalChoice,
+        'functionChoice': _functionChoice,
+        'accessories': _accessories,
+        'accessoriesText': _accessoriesCtrl.text,
+        'brand': _brandCtrl.text,
+        'model': _modelCtrl.text,
+        'purchaseYear': _purchaseYearCtrl.text,
+        'physicalCondition': _physicalCondCtrl.text,
+        'functionCondition': _funcCondCtrl.text,
+        'serial': _serialCtrl.text,
+      });
+    } else {
+      data.addAll(<String, dynamic>{
+        'karat': _karatCtrl.text,
+        'weight': _weightCtrl.text,
+        'goldCondition': _goldCondCtrl.text,
+        'vehicleType': _vehicleTypeCtrl.text,
+        'vehicleBrandModel': _vehicleBrandModelCtrl.text,
+        'vehicleYear': _vehicleYearCtrl.text,
+        'plate': _plateCtrl.text,
+        'ownerName': _ownerNameCtrl.text,
+      });
+    }
+    try {
+      await _draftStore.write(
+        PawnDraft(categoryId: _category.apiId, data: data),
+      );
+    } catch (_) {
+      // Draft lokal opsional.
     }
   }
 
@@ -219,6 +325,7 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
         details['Kondisi Fisik'] = _physicalCondCtrl.text.trim();
         details['Kondisi Fungsi'] = _funcCondCtrl.text.trim();
         details['Kelengkapan'] = _accessoriesCtrl.text.trim();
+        details['Deskripsi Tambahan'] = _notesCtrl.text.trim();
         if (_serialCtrl.text.trim().isNotEmpty) {
           details['Nomor Seri/IMEI'] = _serialCtrl.text.trim();
         }
@@ -236,19 +343,65 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
         details['Nomor Polisi'] = _plateCtrl.text.trim().toUpperCase();
         details['Nama Pemilik Dokumen'] = _ownerNameCtrl.text.trim();
     }
-    if (_notesCtrl.text.trim().isNotEmpty) {
+    if (_category != PawnCategory.elektronik &&
+        _notesCtrl.text.trim().isNotEmpty) {
       details['Catatan Tambahan'] = _notesCtrl.text.trim();
     }
     return details;
   }
 
+  bool get _isCurrentStepValid {
+    switch (_stepIndex) {
+      case 0:
+        if (_category == PawnCategory.elektronik) {
+          return _deviceTypeCtrl.text.trim().isNotEmpty &&
+              _brandCtrl.text.trim().isNotEmpty &&
+              _modelCtrl.text.trim().isNotEmpty;
+        }
+        if (_category == PawnCategory.emas) {
+          return _goldTypeCtrl.text.trim().isNotEmpty &&
+              _weightCtrl.text.trim().isNotEmpty &&
+              _goldCondCtrl.text.trim().isNotEmpty;
+        }
+        return _vehicleTypeCtrl.text.trim().isNotEmpty &&
+            _vehicleBrandModelCtrl.text.trim().isNotEmpty &&
+            _vehicleYearCtrl.text.trim().isNotEmpty &&
+            _plateCtrl.text.trim().isNotEmpty &&
+            _ownerNameCtrl.text.trim().isNotEmpty;
+      case 1:
+        if (_category == PawnCategory.elektronik) {
+          return _physicalCondCtrl.text.trim().isNotEmpty &&
+              _funcCondCtrl.text.trim().isNotEmpty &&
+              _accessories.isNotEmpty &&
+              _notesCtrl.text.trim().isNotEmpty;
+        }
+        return true;
+      case 2:
+        return _docSlots
+            .where((slot) => slot.required)
+            .every((slot) => _uploadedDocs.containsKey(slot.title));
+      default:
+        return true;
+    }
+  }
+
   void _nextStep() {
     if (_stepIndex == 0) {
-      if (!_step1FormKey.currentState!.validate()) return;
+      final GlobalKey<FormState> key = _category == PawnCategory.elektronik
+          ? _identityFormKey
+          : _step1FormKey;
+      if (!(key.currentState?.validate() ?? false)) return;
+      _saveDraft();
       setState(() => _stepIndex = 1);
       return;
     }
-    if (_stepIndex == 1) {
+    if (_category == PawnCategory.elektronik && _stepIndex == 1) {
+      if (!(_conditionFormKey.currentState?.validate() ?? false)) return;
+      _saveDraft();
+      setState(() => _stepIndex = _uploadStep);
+      return;
+    }
+    if (_stepIndex == _uploadStep) {
       final missingRequired = _docSlots
           .where((slot) => slot.required && !_uploadedDocs.containsKey(slot.title))
           .isNotEmpty;
@@ -258,7 +411,7 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
       }
       setState(() {
         _showUploadValidation = false;
-        _stepIndex = 2;
+        _stepIndex = _reviewStep;
       });
     }
   }
@@ -350,6 +503,12 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
       }
 
       if (!mounted) return;
+      try {
+        await _draftStore.clear();
+      } catch (_) {
+        // Draft lokal opsional.
+      }
+      if (!mounted) return;
       setState(() => _submittedApp = result);
     } catch (e) {
       if (!mounted) return;
@@ -385,15 +544,26 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _StepHeader(currentStep: _stepIndex),
+            _StepHeader(
+              currentStep: _stepIndex,
+              totalSteps: _stepCount,
+              titles: _stepTitles,
+            ),
             Expanded(
               child: IndexedStack(
                 index: _stepIndex,
-                children: [
-                  _buildStep1Form(),
-                  _buildStep2Upload(),
-                  _buildStep3Review(),
-                ],
+                children: _category == PawnCategory.elektronik
+                    ? <Widget>[
+                        _buildElektronikIdentityStep(),
+                        _buildElektronikConditionStep(),
+                        _buildStep2Upload(),
+                        _buildStep3Review(),
+                      ]
+                    : <Widget>[
+                        _buildStep1Form(),
+                        _buildStep2Upload(),
+                        _buildStep3Review(),
+                      ],
               ),
             ),
             _buildBottomBar(),
@@ -457,7 +627,6 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
             ],
-            if (_category == PawnCategory.elektronik) ..._buildElektronikFields(),
             if (_category == PawnCategory.emas) ..._buildEmasFields(),
             if (_category == PawnCategory.bpkb) ..._buildBpkbFields(),
             const SizedBox(height: AppSpacing.md),
@@ -483,67 +652,247 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
     );
   }
 
-  List<Widget> _buildElektronikFields() {
-    return [
-      AppTextField(
-        label: 'Jenis Perangkat',
-        controller: _deviceTypeCtrl,
-        hint: 'Contoh: Smartphone, Laptop, Kamera',
-        validator: (v) =>
-            AppValidators.requiredField(v, label: 'Jenis perangkat'),
+  Widget _buildElektronikIdentityStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.screenHorizontal,
+        vertical: AppSpacing.md,
       ),
-      const SizedBox(height: AppSpacing.md),
-      AppTextField(
-        label: 'Merek',
-        controller: _brandCtrl,
-        hint: 'Contoh: Apple, Samsung, Asus',
-        validator: (v) => AppValidators.requiredField(v, label: 'Merek'),
+      child: Form(
+        key: _identityFormKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _StepIntro(
+              title: 'Identitas Perangkat',
+              subtitle:
+                  'Pilih jenis perangkat, lalu isi merek dan model sesuai label di perangkat.',
+            ),
+            _ChoiceChips(
+              label: 'Jenis Perangkat *',
+              helper: 'Pilih salah satu. Pilih Lainnya untuk jenis di luar daftar.',
+              choices: const ['Smartphone', 'Laptop', 'Kamera', 'Tablet', 'Lainnya'],
+              selected: _deviceTypeChoice,
+              onSelected: (String value) {
+                setState(() {
+                  _deviceTypeChoice = value;
+                  _deviceTypeCtrl.text = value == 'Lainnya' ? '' : value;
+                  _saveDraft();
+                });
+              },
+            ),
+            if (_deviceTypeChoice == 'Lainnya') ...[
+              const SizedBox(height: AppSpacing.md),
+              AppTextField(
+                label: 'Jenis Perangkat Lainnya *',
+                controller: _deviceTypeCtrl,
+                hint: 'Contoh: Smartwatch, Drone',
+                helperText: 'Wajib diisi bila memilih Lainnya.',
+                validator: (v) => AppValidators.requiredField(
+                  v,
+                  label: 'Jenis perangkat',
+                ),
+                onChanged: (_) {
+                  setState(() {});
+                  _saveDraft();
+                },
+              ),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              label: 'Merek *',
+              controller: _brandCtrl,
+              hint: 'Contoh: Apple, Samsung, Asus',
+              helperText: 'Nama produsen perangkat.',
+              validator: (v) =>
+                  AppValidators.requiredField(v, label: 'Merek'),
+              onChanged: (_) {
+                  setState(() {});
+                  _saveDraft();
+                },
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              label: 'Model / Tipe *',
+              controller: _modelCtrl,
+              hint: 'Contoh: MacBook Air M2 256GB',
+              helperText: 'Lihat label perangkat atau pengaturan sistem.',
+              validator: (v) =>
+                  AppValidators.requiredField(v, label: 'Model/tipe'),
+              onChanged: (_) {
+                  setState(() {});
+                  _saveDraft();
+                },
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              label: 'Tahun Pembelian (Opsional)',
+              controller: _purchaseYearCtrl,
+              hint: 'Contoh: 2023',
+              helperText: 'Tidak wajib; kosongkan bila tidak diketahui.',
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) => _saveDraft(),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+        ),
       ),
-      const SizedBox(height: AppSpacing.md),
-      AppTextField(
-        label: 'Model / Tipe',
-        controller: _modelCtrl,
-        hint: 'Contoh: MacBook Air M2 256GB',
-        validator: (v) => AppValidators.requiredField(v, label: 'Model/tipe'),
+    );
+  }
+
+  Widget _buildElektronikConditionStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.screenHorizontal,
+        vertical: AppSpacing.md,
       ),
-      const SizedBox(height: AppSpacing.md),
-      AppTextField(
-        label: 'Tahun Pembelian (Opsional)',
-        controller: _purchaseYearCtrl,
-        hint: 'Contoh: 2023',
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      child: Form(
+        key: _conditionFormKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _StepIntro(
+              title: 'Kondisi & Kelengkapan',
+              subtitle:
+                  'Jujurkan kondisi perangkat agar penaksiran tidak terhambat.',
+            ),
+            _ChoiceChips(
+              label: 'Kondisi Fisik *',
+              helper: 'Pilih kondisi fisik yang paling sesuai.',
+              choices: const [
+                'Mulus',
+                'Ada lecet ringan',
+                'Ada penyok/retak',
+                'Lainnya',
+              ],
+              selected: _physicalChoice,
+              onSelected: (String value) {
+                setState(() {
+                  _physicalChoice = value;
+                  _physicalCondCtrl.text = value == 'Lainnya' ? '' : value;
+                  _saveDraft();
+                });
+              },
+            ),
+            if (_physicalChoice == 'Lainnya') ...[
+              const SizedBox(height: AppSpacing.md),
+              AppTextField(
+                label: 'Kondisi Fisik Lainnya *',
+                controller: _physicalCondCtrl,
+                hint: 'Jelaskan kondisi fisik perangkat',
+                validator: (v) => AppValidators.requiredField(
+                  v,
+                  label: 'Kondisi fisik',
+                ),
+                onChanged: (_) {
+                  setState(() {});
+                  _saveDraft();
+                },
+              ),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            _ChoiceChips(
+              label: 'Kondisi Fungsi *',
+              helper: 'Pilih kondisi fungsi perangkat saat ini.',
+              choices: const [
+                'Normal 100%',
+                'Ada kendala kecil',
+                'Sebagian tidak berfungsi',
+                'Lainnya',
+              ],
+              selected: _functionChoice,
+              onSelected: (String value) {
+                setState(() {
+                  _functionChoice = value;
+                  _funcCondCtrl.text = value == 'Lainnya' ? '' : value;
+                  _saveDraft();
+                });
+              },
+            ),
+            if (_functionChoice == 'Lainnya') ...[
+              const SizedBox(height: AppSpacing.md),
+              AppTextField(
+                label: 'Kondisi Fungsi Lainnya *',
+                controller: _funcCondCtrl,
+                hint: 'Jelaskan fungsi perangkat',
+                validator: (v) => AppValidators.requiredField(
+                  v,
+                  label: 'Kondisi fungsi',
+                ),
+                onChanged: (_) {
+                  setState(() {});
+                  _saveDraft();
+                },
+              ),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            _MultiChoiceChips(
+              label: 'Kelengkapan *',
+              helper: 'Pilih semua yang disertakan saat pengajuan.',
+              choices: const [
+                'Unit',
+                'Charger',
+                'Dus',
+                'Kabel',
+                'Headset',
+                'Aksesori lain',
+              ],
+              selected: _accessories,
+              onToggle: (String value) {
+                setState(() {
+                  if (_accessories.contains(value)) {
+                    _accessories.remove(value);
+                  } else {
+                    _accessories.add(value);
+                  }
+                  _accessoriesCtrl.text = _accessories.join(', ');
+                  _saveDraft();
+                });
+              },
+              errorText: _accessories.isEmpty
+                  ? 'Pilih minimal satu kelengkapan.'
+                  : null,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              label: 'Deskripsi Tambahan *',
+              controller: _notesCtrl,
+              hint: 'Contoh: Baterai 90%, layar tanpa goresan',
+              helperText: 'Jelangkan detail yang belum tercakup di atas.',
+              maxLines: 3,
+              validator: (v) => AppValidators.requiredField(
+                v,
+                label: 'Deskripsi tambahan',
+              ),
+              onChanged: (_) {
+                  setState(() {});
+                  _saveDraft();
+                },
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              label: 'Nomor Seri / IMEI (Opsional)',
+              controller: _serialCtrl,
+              hint: 'Untuk membantu proses verifikasi',
+              helperText: 'Data sensitif hanya dipakai untuk verifikasi.',
+              onChanged: (_) => _saveDraft(),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              label: 'Perkiraan Nilai Barang (Opsional)',
+              controller: _estimatedValueCtrl,
+              hint: 'Contoh: 5000000',
+              helperText: 'Input kamu sendiri; aplikasi tidak menaksir otomatis.',
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) => _saveDraft(),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+        ),
       ),
-      const SizedBox(height: AppSpacing.md),
-      AppTextField(
-        label: 'Kondisi Fisik',
-        controller: _physicalCondCtrl,
-        hint: 'Contoh: Mulus, tidak ada retak',
-        validator: (v) =>
-            AppValidators.requiredField(v, label: 'Kondisi fisik'),
-      ),
-      const SizedBox(height: AppSpacing.md),
-      AppTextField(
-        label: 'Kondisi Fungsi',
-        controller: _funcCondCtrl,
-        hint: 'Contoh: Semua fitur berfungsi normal',
-        validator: (v) =>
-            AppValidators.requiredField(v, label: 'Kondisi fungsi'),
-      ),
-      const SizedBox(height: AppSpacing.md),
-      AppTextField(
-        label: 'Kelengkapan',
-        controller: _accessoriesCtrl,
-        hint: 'Contoh: Unit, charger ori, dus',
-        validator: (v) => AppValidators.requiredField(v, label: 'Kelengkapan'),
-      ),
-      const SizedBox(height: AppSpacing.md),
-      AppTextField(
-        label: 'Nomor Seri / IMEI (Opsional)',
-        controller: _serialCtrl,
-        hint: 'Untuk membantu proses verifikasi',
-      ),
-    ];
+    );
   }
 
   List<Widget> _buildEmasFields() {
@@ -829,11 +1178,13 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
           Expanded(
             flex: 2,
             child: PrimaryButton(
-              label: _stepIndex == 2
+              label: _stepIndex == _reviewStep
                   ? (_isRevisionMode ? 'Kirim Perbaikan' : 'Kirim Pengajuan')
                   : 'Lanjutkan',
               isLoading: _isSubmitting,
-              onPressed: _stepIndex == 2 ? _submitFinal : _nextStep,
+              onPressed: _stepIndex == _reviewStep
+                  ? (_isCurrentStepValid ? _submitFinal : null)
+                  : (_isCurrentStepValid ? _nextStep : null),
             ),
           ),
         ],
@@ -842,14 +1193,158 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
   }
 }
 
-class _StepHeader extends StatelessWidget {
-  const _StepHeader({required this.currentStep});
+class _StepIntro extends StatelessWidget {
+  const _StepIntro({required this.title, required this.subtitle});
 
-  final int currentStep;
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    const titles = ['Data Barang', 'Unggah Berkas', 'Tinjau & Kirim'];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTextStyles.sectionHeading),
+          const SizedBox(height: 4),
+          Text(subtitle, style: AppTextStyles.bodySecondary),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChoiceChips extends StatelessWidget {
+  const _ChoiceChips({
+    required this.label,
+    required this.helper,
+    required this.choices,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final String helper;
+  final List<String> choices;
+  final String? selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppTextStyles.bodyMedium),
+        const SizedBox(height: AppSpacing.xs + 2),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final String choice in choices)
+              ChoiceChip(
+                label: Text(choice),
+                selected: selected == choice,
+                onSelected: (_) => onSelected(choice),
+                selectedColor: AppColors.primarySoft,
+                backgroundColor: AppColors.surface,
+                side: BorderSide(
+                  color: selected == choice
+                      ? AppColors.primary
+                      : AppColors.border,
+                ),
+                labelStyle: AppTextStyles.caption.copyWith(
+                  color: selected == choice
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                  fontWeight:
+                      selected == choice ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(helper, style: AppTextStyles.caption),
+      ],
+    );
+  }
+}
+
+class _MultiChoiceChips extends StatelessWidget {
+  const _MultiChoiceChips({
+    required this.label,
+    required this.helper,
+    required this.choices,
+    required this.selected,
+    required this.onToggle,
+    this.errorText,
+  });
+
+  final String label;
+  final String helper;
+  final List<String> choices;
+  final List<String> selected;
+  final ValueChanged<String> onToggle;
+  final String? errorText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppTextStyles.bodyMedium),
+        const SizedBox(height: AppSpacing.xs + 2),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final String choice in choices)
+              FilterChip(
+                label: Text(choice),
+                selected: selected.contains(choice),
+                onSelected: (_) => onToggle(choice),
+                selectedColor: AppColors.primarySoft,
+                backgroundColor: AppColors.surface,
+                side: BorderSide(
+                  color: selected.contains(choice)
+                      ? AppColors.primary
+                      : AppColors.border,
+                ),
+                labelStyle: AppTextStyles.caption.copyWith(
+                  color: selected.contains(choice)
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                  fontWeight: selected.contains(choice)
+                      ? FontWeight.w600
+                      : FontWeight.w500,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(errorText ?? helper,
+            style: AppTextStyles.caption.copyWith(
+              color: errorText == null ? null : AppColors.danger,
+            )),
+      ],
+    );
+  }
+}
+
+class _StepHeader extends StatelessWidget {
+  const _StepHeader({
+    required this.currentStep,
+    required this.titles,
+    required this.totalSteps,
+  });
+
+  final int currentStep;
+  final List<String> titles;
+  final int totalSteps;
+
+  @override
+  Widget build(BuildContext context) {
+    final int safeStep = currentStep.clamp(0, totalSteps - 1);
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.symmetric(
@@ -863,13 +1358,13 @@ class _StepHeader extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Langkah ${currentStep + 1} dari 3 • ${titles[currentStep]}',
+                'Langkah ${safeStep + 1} dari $totalSteps • ${titles[safeStep]}',
                 style: AppTextStyles.captionBold.copyWith(
                   color: AppColors.primary,
                 ),
               ),
               Text(
-                '${(((currentStep + 1) / 3) * 100).round()}%',
+                '${(((safeStep + 1) / totalSteps) * 100).round()}%',
                 style: AppTextStyles.captionBold,
               ),
             ],
@@ -878,7 +1373,7 @@ class _StepHeader extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: (currentStep + 1) / 3,
+              value: (safeStep + 1) / totalSteps,
               minHeight: 6,
               backgroundColor: AppColors.primarySoft,
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
