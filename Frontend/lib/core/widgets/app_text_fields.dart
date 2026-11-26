@@ -12,6 +12,7 @@ class AppTextField extends StatelessWidget {
     this.controller,
     this.hint,
     this.helperText,
+    this.errorText,
     this.validator,
     this.keyboardType,
     this.textInputAction,
@@ -30,6 +31,7 @@ class AppTextField extends StatelessWidget {
   final TextEditingController? controller;
   final String? hint;
   final String? helperText;
+  final String? errorText;
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
@@ -69,6 +71,7 @@ class AppTextField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             helperText: helperText,
+            errorText: errorText,
             helperMaxLines: 2,
             prefixIcon: prefixIcon != null
                 ? Icon(prefixIcon, color: AppColors.textSecondary, size: 20)

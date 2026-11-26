@@ -3,10 +3,10 @@
 Aplikasi pengajuan gadai digital untuk prototipe akademik. Dibangun dengan
 Flutter (Android) dan disiapkan untuk backend Laravel REST API.
 
-> **Status:** Prompt 01–08 selesai: design system, splash & onboarding,
-> login/register/autentikasi, Home Dashboard, pemilihan kategori, serta
-> form pengajuan Elektronik, Emas, dan BPKB. Backend Laravel dan fitur
-> lanjutan masih memakai mode demo berlabel.
+> **Status:** Prompt 01–10 selesai: design system, splash & onboarding,
+> autentikasi, Home Dashboard, pemilihan kategori, form Elektronik/Emas/BPKB,
+> upload dokumen, dan kalkulator simulasi. Backend Laravel dan beberapa
+> fitur lanjutan masih memakai mode demo berlabel.
 
 ## Fitur yang sudah berjalan
 
@@ -42,8 +42,16 @@ Flutter (Android) dan disiapkan untuk backend Laravel REST API.
 - **Form BPKB**: merek & model terpisah, tahun 4 digit, format nomor
   polisi, pemberitahuan privasi dokumen, nomor polisi disamarkan di
   ringkasan/detail, tanpa klaim pengecekan legalitas otomatis.
-- Upload dokumen, riwayat, detail transaksi, outlet, promo, notifikasi,
-  dan FAQ (mode demo berlabel).
+- **Upload dokumen**: picker kamera/galeri (`image_picker`), preview
+  thumbnail, ganti/hapus, validasi JPG/PNG/PDF maks 5 MB, indikator jumlah
+  berkas, progress, retry saat gagal, dan pesan error jelas. Multipart via
+  Dio ke Laravel; metadata privat tanpa URL publik. Mode demo tidak
+  mengklaim berkas tersimpan di server.
+- **Simulasi gadai**: kategori, nilai barang, tenor dari konfigurasi,
+  plafon/biaya/total sesuai rumus PRD, validasi kosong/nol/angka besar,
+  label "parameter demo" dan CTA lanjut pengajuan.
+- Riwayat, detail transaksi, outlet, promo, notifikasi, dan FAQ (mode demo
+  berlabel).
 - Theme terpusat Navy Blue + Gold dengan komponen reusable.
 
 ## Yang belum dibuat
@@ -136,7 +144,7 @@ flutter build apk --debug
 Status terakhir:
 
 - `flutter analyze`: tidak ada issue.
-- `flutter test`: **16 test lulus** (auth, kategori/form, emas/BPKB, widget).
+- `flutter test`: **23 test lulus** (auth, kategori/form, emas/BPKB, upload/simulasi, widget).
 - `flutter build web --release`: berhasil.
 - `flutter build apk --debug`: berhasil.
 

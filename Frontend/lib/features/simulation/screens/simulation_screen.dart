@@ -45,6 +45,22 @@ class _SimulationScreenState extends State<SimulationScreen> {
     setState(() => _estimatedValue = value);
   }
 
+  String? _valueValidation(SimulationConfig config) {
+    final String raw = _valueController.text.trim();
+    if (raw.isEmpty) return 'Nilai barang wajib diisi.';
+    final double? parsed = AppFormatters.parseCurrency(raw);
+    if (parsed == null || parsed <= 0) {
+      return 'Nilai barang harus lebih dari 0.';
+    }
+    if (parsed < config.minEstimatedValue) {
+      return 'Nilai minimal ${AppFormatters.formatRupiah(config.minEstimatedValue)}.';
+    }
+    if (parsed > config.maxEstimatedValue) {
+      return 'Nilai maksimal ${AppFormatters.formatRupiah(config.maxEstimatedValue)}.';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = AppStateScope.of(context);
@@ -65,8 +81,8 @@ class _SimulationScreenState extends State<SimulationScreen> {
       _selectedTenor = config.allowedTenorDays.first;
     }
 
-    final isValidValue = _estimatedValue >= config.minEstimatedValue &&
-        _estimatedValue <= config.maxEstimatedValue;
+    final String? validationError = _valueValidation(config);
+    final bool isValidValue = validationError == null;
     final result = isValidValue
         ? config.calculate(
             category: _selectedCategory,
@@ -107,6 +123,23 @@ class _SimulationScreenState extends State<SimulationScreen> {
               ],
             ),
           ),
+          if (config.isDemo) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: const [
+                Icon(Icons.science_outlined,
+                    size: 16, color: AppColors.warning),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Parameter demo — bukan tarif resmi. Nilai berasal dari '
+                    'konfigurasi simulasi, bukan kebijakan bisnis.',
+                    style: AppTextStyles.caption,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: AppSpacing.lg),
           const Text('Kategori Barang', style: AppTextStyles.sectionHeading),
           const SizedBox(height: AppSpacing.sm),
@@ -142,6 +175,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
             onChanged: _onValueChanged,
             helperText:
                 'Rentang simulasi: ${AppFormatters.formatRupiah(config.minEstimatedValue)} - ${AppFormatters.formatRupiah(config.maxEstimatedValue)}',
+            errorText: validationError,
           ),
           const SizedBox(height: AppSpacing.sm),
           Wrap(
@@ -230,6 +264,11 @@ class _SimulationScreenState extends State<SimulationScreen> {
                   const SizedBox(height: AppSpacing.md),
                   const Divider(),
                   const SizedBox(height: AppSpacing.sm),
+                  _SummaryRow(
+                    label: 'Nilai Barang yang Diinput',
+                    value: AppFormatters.formatRupiah(_estimatedValue),
+                  ),
+                  const SizedBox(height: 6),
                   _SummaryRow(
                     label: 'Persentase Plafon (${_selectedCategory.label})',
                     value: '${(result.plafonPercentage * 100).round()}%',

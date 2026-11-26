@@ -79,6 +79,7 @@ class MockGadaikanRepository implements GadaikanRepository {
     maxEstimatedValue: 100000000,
     disclaimer:
         'Hasil simulasi, bukan penawaran final. Tarif dan plafon akhir ditentukan setelah pemeriksaan fisik dan dokumen.',
+    isDemo: true,
   );
 
   final List<PawnApplication> _applications = [

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import '../widgets/status_badge.dart';
 
@@ -197,6 +199,15 @@ class PawnDocument {
     required this.fileName,
     required this.sizeLabel,
     this.isSensitive = false,
+    this.localPath,
+    this.mimeType,
+    this.fileSizeBytes,
+    this.uploadProgress,
+    this.uploadError,
+    this.isUploadedToServer = false,
+    this.isDemo = false,
+    this.previewBytes,
+    this.serverId,
   });
 
   final String id;
@@ -204,6 +215,63 @@ class PawnDocument {
   final String fileName;
   final String sizeLabel;
   final bool isSensitive;
+
+  /// Path lokal (privat) dari picker; tidak pernah dipublikasikan di UI.
+  final String? localPath;
+  final String? mimeType;
+  final int? fileSizeBytes;
+
+  /// Progres 0..1 saat mengunggah; null bila tidak dalam proses.
+  final double? uploadProgress;
+  final String? uploadError;
+
+  /// True hanya jika server benar-benar menyimpan berkas.
+  final bool isUploadedToServer;
+
+  /// True untuk berkas mode demo yang belum tersimpan di server.
+  final bool isDemo;
+
+  /// Preview thumbnail dari picker (tidak dipublikasikan).
+  final Uint8List? previewBytes;
+
+  /// ID metadata berkas dari server (bukan URL publik).
+  final String? serverId;
+
+  bool get hasUploadError => uploadError != null && uploadError!.isNotEmpty;
+
+  PawnDocument copyWith({
+    String? fileName,
+    String? sizeLabel,
+    String? localPath,
+    String? mimeType,
+    int? fileSizeBytes,
+    double? uploadProgress,
+    String? uploadError,
+    bool? isUploadedToServer,
+    bool? isDemo,
+    Uint8List? previewBytes,
+    String? serverId,
+    bool clearUploadProgress = false,
+    bool clearUploadError = false,
+  }) {
+    return PawnDocument(
+      id: id,
+      label: label,
+      fileName: fileName ?? this.fileName,
+      sizeLabel: sizeLabel ?? this.sizeLabel,
+      isSensitive: isSensitive,
+      localPath: localPath ?? this.localPath,
+      mimeType: mimeType ?? this.mimeType,
+      fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
+      uploadProgress:
+          clearUploadProgress ? null : (uploadProgress ?? this.uploadProgress),
+      uploadError: clearUploadError ? null : (uploadError ?? this.uploadError),
+      isUploadedToServer: isUploadedToServer ?? this.isUploadedToServer,
+      isDemo: isDemo ?? this.isDemo,
+      previewBytes: previewBytes ?? this.previewBytes,
+      serverId: serverId ?? this.serverId,
+    );
+  }
 }
 
 class PawnAssessment {
@@ -389,6 +457,7 @@ class SimulationConfig {
     required this.minEstimatedValue,
     required this.maxEstimatedValue,
     required this.disclaimer,
+    this.isDemo = false,
   });
 
   final Map<PawnCategory, double> plafonPercentageByCategory;
@@ -398,6 +467,10 @@ class SimulationConfig {
   final double minEstimatedValue;
   final double maxEstimatedValue;
   final String disclaimer;
+
+  /// True bila parameter berasal dari simulasi demo, bukan kebijakan
+  /// bisnis resmi/backend.
+  final bool isDemo;
 
   SimulationResult calculate({
     required PawnCategory category,

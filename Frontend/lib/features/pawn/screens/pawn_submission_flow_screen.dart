@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/models/gadaikan_models.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/services/document_upload_service.dart';
 import '../../../core/storage/pawn_draft_store.dart';
 import '../../../core/widgets/app_buttons.dart';
 import '../../../core/widgets/app_cards.dart';
@@ -84,10 +87,23 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
 
   // Uploaded documents keyed by slot id
   final Map<String, PawnDocument> _uploadedDocs = {};
+  final Map<String, String> _selectionErrors = <String, String>{};
   PawnApplication? _submittedApp;
   final PawnDraftStore _draftStore = PawnDraftStore();
+  final ImagePicker _imagePicker = ImagePicker();
+  final DocumentUploadService _uploadService = AppConfig.useMockAuth
+      ? MockDocumentUploadService()
+      : ApiDocumentUploadService();
 
   bool get _isRevisionMode => widget.existingApplication != null;
+
+  bool _isDocumentReady(PawnDocument? doc) {
+    if (doc == null || doc.hasUploadError) return false;
+    if (doc.uploadProgress != null && doc.uploadProgress! < 1) return false;
+    // Berkas lama (mode perbaikan) tidak punya path lokal dan tetap valid.
+    if (doc.localPath == null) return true;
+    return doc.isDemo || doc.isUploadedToServer;
+  }
 
   int get _uploadStep => _category == PawnCategory.elektronik ? 2 : 1;
   int get _reviewStep => _category == PawnCategory.elektronik ? 3 : 2;
@@ -431,7 +447,7 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
       case 2:
         return _docSlots
             .where((slot) => slot.required)
-            .every((slot) => _uploadedDocs.containsKey(slot.title));
+            .every((slot) => _isDocumentReady(_uploadedDocs[slot.title]));
       default:
         return true;
     }
@@ -455,7 +471,10 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
     }
     if (_stepIndex == _uploadStep) {
       final missingRequired = _docSlots
-          .where((slot) => slot.required && !_uploadedDocs.containsKey(slot.title))
+          .where(
+            (slot) =>
+                slot.required && !_isDocumentReady(_uploadedDocs[slot.title]),
+          )
           .isNotEmpty;
       if (missingRequired) {
         setState(() => _showUploadValidation = true);
@@ -469,7 +488,7 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
   }
 
   Future<void> _pickDocument(_DocSlotConfig slot) async {
-    final source = await showModalBottomSheet<String>(
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -484,21 +503,22 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
               Text('Pilih Sumber Berkas', style: AppTextStyles.sectionHeading),
               const SizedBox(height: 4),
               const Text(
-                'Format JPG/PNG/PDF, ukuran maksimal 5 MB.',
+                'Format JPG/PNG/PDF, ukuran maksimal 5 MB. Berkas sensitif '
+                'disimpan privat.',
                 style: AppTextStyles.caption,
               ),
               const SizedBox(height: AppSpacing.md),
               ListTile(
                 leading: const Icon(Icons.camera_alt_outlined,
                     color: AppColors.primary),
-                title: const Text('Ambil Foto dari Kamera (Demo)'),
-                onTap: () => Navigator.of(ctx).pop('kamera_${slot.sampleFile}'),
+                title: const Text('Ambil Foto dari Kamera'),
+                onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_outlined,
                     color: AppColors.primary),
-                title: const Text('Pilih dari Galeri (Demo)'),
-                onTap: () => Navigator.of(ctx).pop('galeri_${slot.sampleFile}'),
+                title: const Text('Pilih dari Galeri / Berkas'),
+                onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
               ),
             ],
           ),
@@ -507,15 +527,129 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
     );
 
     if (source == null || !mounted) return;
-    setState(() {
-      _uploadedDocs[slot.title] = PawnDocument(
-        id: 'doc-${DateTime.now().millisecondsSinceEpoch}',
+
+    try {
+      final XFile? file = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 2400,
+      );
+      if (file == null || !mounted) return;
+
+      final int size = await file.length();
+      final PickedDocument picked = PickedDocument(
+        path: file.path,
+        name: file.name,
+        sizeBytes: size,
+        mimeType: file.mimeType,
+      );
+      final String? validationError = DocumentValidation.validate(picked);
+      if (validationError != null) {
+        if (!mounted) return;
+        setState(() => _selectionErrors[slot.title] = validationError);
+        return;
+      }
+
+      final Uint8List preview = await file.readAsBytes();
+      if (!mounted) return;
+      final PawnDocument document = PawnDocument(
+        id: 'doc-${DateTime.now().microsecondsSinceEpoch}',
         label: slot.title,
-        fileName: source,
-        sizeLabel: '1.1 MB',
+        fileName: file.name,
+        sizeLabel: '${(size / 1024 / 1024).toStringAsFixed(2)} MB',
         isSensitive: slot.isSensitive,
+        localPath: file.path,
+        mimeType: file.mimeType,
+        fileSizeBytes: size,
+        previewBytes: preview,
+        uploadProgress: 0,
+        isDemo: _uploadService.isMock,
+      );
+      setState(() {
+        _selectionErrors.remove(slot.title);
+        _uploadedDocs[slot.title] = document;
+      });
+      await _uploadDocument(slot, picked);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _selectionErrors[slot.title] =
+          'Berkas tidak dapat dibaca. Pilih berkas lain.');
+    }
+  }
+
+  Future<void> _uploadDocument(
+    _DocSlotConfig slot,
+    PickedDocument picked,
+  ) async {
+    final PawnDocument? current = _uploadedDocs[slot.title];
+    if (current == null) return;
+
+    setState(() {
+      _uploadedDocs[slot.title] = current.copyWith(
+        clearUploadError: true,
+        uploadProgress: 0,
       );
     });
+
+    try {
+      final UploadedDocumentMeta meta = await _uploadService.upload(
+        file: picked,
+        isSensitive: slot.isSensitive,
+        onProgress: (double progress) {
+          if (!mounted) return;
+          setState(() {
+            final PawnDocument? doc = _uploadedDocs[slot.title];
+            if (doc != null) {
+              _uploadedDocs[slot.title] = doc.copyWith(uploadProgress: progress);
+            }
+          });
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        final PawnDocument? doc = _uploadedDocs[slot.title];
+        if (doc != null) {
+          _uploadedDocs[slot.title] = doc.copyWith(
+            clearUploadProgress: true,
+            clearUploadError: true,
+            isUploadedToServer: !meta.isDemo,
+            isDemo: meta.isDemo,
+            serverId: meta.serverId,
+          );
+        }
+      });
+    } on DocumentUploadException catch (error) {
+      _setUploadError(slot.title, error.message);
+    } catch (_) {
+      _setUploadError(slot.title, 'Gagal mengunggah berkas. Coba lagi.');
+    }
+  }
+
+  void _setUploadError(String slotTitle, String message) {
+    if (!mounted) return;
+    setState(() {
+      final PawnDocument? doc = _uploadedDocs[slotTitle];
+      if (doc != null) {
+        _uploadedDocs[slotTitle] = doc.copyWith(
+          uploadError: message,
+          clearUploadProgress: true,
+        );
+      }
+    });
+  }
+
+  Future<void> _retryUpload(_DocSlotConfig slot) async {
+    final PawnDocument? doc = _uploadedDocs[slot.title];
+    if (doc?.localPath == null) return;
+    await _uploadDocument(
+      slot,
+      PickedDocument(
+        path: doc!.localPath!,
+        name: doc.fileName,
+        sizeBytes: doc.fileSizeBytes ?? 0,
+        mimeType: doc.mimeType,
+      ),
+    );
   }
 
   Future<void> _submitFinal() async {
@@ -1156,6 +1290,14 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
   }
 
   Widget _buildStep2Upload() {
+    final int requiredCount =
+        _docSlots.where((slot) => slot.required).length;
+    final int addedCount =
+        _docSlots.where((slot) => _uploadedDocs.containsKey(slot.title)).length;
+    final int readyCount = _docSlots
+        .where((slot) => _isDocumentReady(_uploadedDocs[slot.title]))
+        .length;
+
     return ListView(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.screenHorizontal,
@@ -1168,9 +1310,45 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Pastikan gambar tidak buram dan informasi terlihat jelas. Format JPG/PNG, maks 5 MB.',
+          'Pilih kamera atau galeri/berkas. Format JPG/PNG/PDF, maks 5 MB.',
           style: AppTextStyles.bodySecondary,
         ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Icon(
+              readyCount >= requiredCount
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.info_outline_rounded,
+              size: 16,
+              color: readyCount >= requiredCount
+                  ? AppColors.success
+                  : AppColors.primary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                '$addedCount berkas ditambahkan • $readyCount dari '
+                '$requiredCount berkas wajib siap',
+                style: AppTextStyles.captionBold.copyWith(
+                  color: readyCount >= requiredCount
+                      ? AppColors.success
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_uploadService.isMock) ...[
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(left: 22),
+            child: Text(
+              'Mode demo: berkas belum dikirim atau tersimpan di server.',
+              style: AppTextStyles.caption.copyWith(color: AppColors.warning),
+            ),
+          ),
+        ],
         if (_category == PawnCategory.bpkb) ...[
           const SizedBox(height: AppSpacing.md),
           AppCard(
@@ -1199,18 +1377,33 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
             title: slot.title,
             subtitle: slot.subtitle,
             isRequired: slot.required,
+            isSensitive: slot.isSensitive,
             fileName: _uploadedDocs[slot.title]?.fileName,
             fileSizeLabel: _uploadedDocs[slot.title]?.sizeLabel,
+            previewBytes: _uploadedDocs[slot.title]?.previewBytes,
+            uploadProgress: _uploadedDocs[slot.title]?.uploadProgress,
+            uploadError: _uploadedDocs[slot.title]?.uploadError,
+            isDemo: _uploadedDocs[slot.title]?.isDemo ?? false,
+            isUploadedToServer:
+                _uploadedDocs[slot.title]?.isUploadedToServer ?? false,
+            isUploading: _uploadedDocs[slot.title]?.uploadProgress != null &&
+                _uploadedDocs[slot.title]!.uploadProgress! < 1,
             errorText: (_showUploadValidation &&
-                    slot.required &&
-                    !_uploadedDocs.containsKey(slot.title))
-                ? 'Berkas ini wajib diunggah'
-                : null,
+                        slot.required &&
+                        !_isDocumentReady(_uploadedDocs[slot.title]))
+                    ? 'Berkas ini wajib ditambahkan'
+                    : _selectionErrors[slot.title],
             onPick: () => _pickDocument(slot),
             onReplace: () => _pickDocument(slot),
             onRemove: () {
-              setState(() => _uploadedDocs.remove(slot.title));
+              setState(() {
+                _uploadedDocs.remove(slot.title);
+                _selectionErrors.remove(slot.title);
+              });
             },
+            onRetry: _uploadedDocs[slot.title]?.hasUploadError == true
+                ? () => _retryUpload(slot)
+                : null,
           ),
           const SizedBox(height: AppSpacing.md),
         ],
