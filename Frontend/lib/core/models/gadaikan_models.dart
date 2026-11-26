@@ -817,6 +817,63 @@ class PromoInfo {
   }
 }
 
+enum NotificationType {
+  applicationSubmitted,
+  revisionRequired,
+  approved,
+  rejected,
+  offerAvailable,
+  demoPayment,
+  dueReminder,
+  general;
+
+  String get label => switch (this) {
+        NotificationType.applicationSubmitted => 'Pengajuan diterima',
+        NotificationType.revisionRequired => 'Perlu revisi',
+        NotificationType.approved => 'Disetujui',
+        NotificationType.rejected => 'Ditolak',
+        NotificationType.offerAvailable => 'Penawaran tersedia',
+        NotificationType.demoPayment => 'Pembayaran demo',
+        NotificationType.dueReminder => 'Pengingat jatuh tempo',
+        NotificationType.general => 'Informasi',
+      };
+
+  IconData get icon => switch (this) {
+        NotificationType.applicationSubmitted => Icons.send_outlined,
+        NotificationType.revisionRequired => Icons.edit_note_outlined,
+        NotificationType.approved => Icons.check_circle_outline_rounded,
+        NotificationType.rejected => Icons.cancel_outlined,
+        NotificationType.offerAvailable => Icons.local_offer_outlined,
+        NotificationType.demoPayment => Icons.receipt_long_outlined,
+        NotificationType.dueReminder => Icons.schedule_rounded,
+        NotificationType.general => Icons.notifications_none_rounded,
+      };
+
+  static NotificationType fromApi(String? raw, String title, String body) {
+    final String value = '${raw ?? ''} $title $body'.toLowerCase();
+    if (value.contains('revisi')) return NotificationType.revisionRequired;
+    if (value.contains('penawaran') || value.contains('offer')) {
+      return NotificationType.offerAvailable;
+    }
+    if (value.contains('pembayaran') || value.contains('payment')) {
+      return NotificationType.demoPayment;
+    }
+    if (value.contains('jatuh tempo') || value.contains('reminder')) {
+      return NotificationType.dueReminder;
+    }
+    if (value.contains('ditolak') || value.contains('rejected')) {
+      return NotificationType.rejected;
+    }
+    if (value.contains('disetujui') || value.contains('approved')) {
+      return NotificationType.approved;
+    }
+    if (value.contains('diterima') || value.contains('submitted')) {
+      return NotificationType.applicationSubmitted;
+    }
+    return NotificationType.general;
+  }
+}
+
 class AppNotification {
   const AppNotification({
     required this.id,
@@ -826,6 +883,7 @@ class AppNotification {
     required this.isRead,
     this.applicationId,
     this.transactionId,
+    this.type = NotificationType.general,
   });
 
   final String id;
@@ -835,6 +893,26 @@ class AppNotification {
   final bool isRead;
   final String? applicationId;
   final String? transactionId;
+  final NotificationType type;
+
+  factory AppNotification.fromApiJson(Map<String, dynamic> json) {
+    final String title = '${json['title'] ?? ''}';
+    final String body = '${json['body'] ?? json['message'] ?? ''}';
+    return AppNotification(
+      id: '${json['id'] ?? ''}',
+      title: title,
+      body: body,
+      createdAt: DateTime.tryParse('${json['created_at'] ?? ''}') ?? DateTime.now(),
+      isRead: json['is_read'] == true || json['read_at'] != null,
+      applicationId: json['application_id']?.toString(),
+      transactionId: json['transaction_id']?.toString(),
+      type: NotificationType.fromApi(
+        json['type']?.toString(),
+        title,
+        body,
+      ),
+    );
+  }
 
   AppNotification copyWith({bool? isRead}) {
     return AppNotification(
@@ -845,6 +923,7 @@ class AppNotification {
       isRead: isRead ?? this.isRead,
       applicationId: applicationId,
       transactionId: transactionId,
+      type: type,
     );
   }
 }
@@ -853,8 +932,18 @@ class FaqItem {
   const FaqItem({
     required this.question,
     required this.answer,
+    this.isDemo = false,
   });
 
   final String question;
   final String answer;
+  final bool isDemo;
+
+  factory FaqItem.fromApiJson(Map<String, dynamic> json) {
+    return FaqItem(
+      question: '${json['question'] ?? ''}',
+      answer: '${json['answer'] ?? ''}',
+      isDemo: json['is_demo'] == true,
+    );
+  }
 }

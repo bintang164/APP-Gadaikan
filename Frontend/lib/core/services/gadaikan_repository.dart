@@ -70,6 +70,7 @@ abstract class GadaikanRepository {
   Future<List<PromoInfo>> getPromotions();
   Future<List<AppNotification>> getNotifications();
   Future<void> markNotificationRead(String notificationId);
+  Future<void> markAllNotificationsRead();
   Future<List<FaqItem>> getFaqs();
 }
 
@@ -298,7 +299,7 @@ class MockGadaikanRepository implements GadaikanRepository {
     ),
   ];
 
-  final List<AppNotification> _notifications = [
+  List<AppNotification> _notifications = [
     AppNotification(
       id: 'notif-1',
       title: 'Penawaran Gadai Tersedia',
@@ -307,6 +308,7 @@ class MockGadaikanRepository implements GadaikanRepository {
       createdAt: DateTime(2026, 11, 25, 10, 20),
       isRead: false,
       applicationId: 'app-1',
+      type: NotificationType.offerAvailable,
     ),
     AppNotification(
       id: 'notif-2',
@@ -316,6 +318,7 @@ class MockGadaikanRepository implements GadaikanRepository {
       createdAt: DateTime(2026, 11, 23, 15, 30),
       isRead: false,
       applicationId: 'app-2',
+      type: NotificationType.revisionRequired,
     ),
     AppNotification(
       id: 'notif-3',
@@ -325,6 +328,7 @@ class MockGadaikanRepository implements GadaikanRepository {
       createdAt: DateTime(2026, 11, 20, 16, 12),
       isRead: true,
       transactionId: 'trx-1',
+      type: NotificationType.demoPayment,
     ),
   ];
 
@@ -855,27 +859,39 @@ class MockGadaikanRepository implements GadaikanRepository {
   }
 
   @override
+  Future<void> markAllNotificationsRead() async {
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    _notifications = _notifications
+        .map((AppNotification notification) => notification.copyWith(isRead: true))
+        .toList();
+  }
+
+  @override
   Future<List<FaqItem>> getFaqs() async {
     return const [
       FaqItem(
         question: 'Apa saja barang yang bisa digadaikan di Gadaikan?',
         answer:
             'Saat ini Gadaikan mendukung tiga kategori utama: Elektronik (smartphone, laptop, kamera), Emas (perhiasan/logam mulia), dan BPKB Kendaraan (motor/mobil).',
+        isDemo: true,
       ),
       FaqItem(
         question: 'Apakah nilai di Simulasi Gadai sudah pasti disetujui?',
         answer:
             'Belum. Fitur Simulasi Gadai hanya memberikan perkiraan awal berdasarkan parameter demo. Nilai taksiran dan plafon final ditetapkan setelah pemeriksaan fisik dan dokumen.',
+        isDemo: true,
       ),
       FaqItem(
         question: 'Apakah data BPKB dan dokumen saya aman?',
         answer:
             'Dokumen sensitif seperti BPKB hanya digunakan untuk proses verifikasi dan tidak ditampilkan secara publik.',
+        isDemo: true,
       ),
       FaqItem(
         question: 'Apakah pembayaran di versi ini memotong saldo asli?',
         answer:
             'Tidak. Seluruh proses pembayaran pada tahap prototipe ini merupakan catatan simulasi demo tanpa transaksi uang sungguhan.',
+        isDemo: true,
       ),
     ];
   }

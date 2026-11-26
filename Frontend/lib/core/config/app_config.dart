@@ -39,6 +39,13 @@ class AppConfig {
   /// ke Laravel). UI menampilkan label "Mode demo".
   static bool get useMockAuth => authMode.toLowerCase() != 'api';
 
+  /// Pengingat jatuh tempo hanya ditampilkan bila diaktifkan lewat
+  /// `--dart-define=ENABLE_REMINDERS=true`. Tidak ada push notification.
+  static const bool remindersEnabled = bool.fromEnvironment(
+    'ENABLE_REMINDERS',
+    defaultValue: false,
+  );
+
   static bool get isProduction => environment == 'production';
   static bool get isDevelopment => !isProduction;
 }

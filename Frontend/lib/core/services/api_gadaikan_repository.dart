@@ -417,4 +417,101 @@ class ApiGadaikanRepository extends MockGadaikanRepository {
       throw Exception(ApiErrorMapper.messageFor(error));
     }
   }
+
+  @override
+  Future<List<AppNotification>> getNotifications() async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.get<dynamic>(
+        '/notifications',
+        options: Options(headers: await _headers()),
+      );
+      final Object? payload = response.data;
+      final List<dynamic> raw = payload is List
+          ? payload
+          : (ApiClient.extractMap(payload)['data'] as List? ?? <dynamic>[]);
+      return raw
+          .whereType<Map<dynamic, dynamic>>()
+          .map((Map<dynamic, dynamic> item) => AppNotification.fromApiJson(
+                Map<String, dynamic>.from(item),
+              ))
+          .toList();
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<void> markNotificationRead(String notificationId) async {
+    try {
+      await _apiClient.dio.post<dynamic>(
+        '/notifications/$notificationId/read',
+        options: Options(headers: await _headers()),
+      );
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<void> markAllNotificationsRead() async {
+    try {
+      await _apiClient.dio.post<dynamic>(
+        '/notifications/read-all',
+        options: Options(headers: await _headers()),
+      );
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<List<FaqItem>> getFaqs() async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.get<dynamic>(
+        '/faqs',
+        options: Options(headers: await _headers()),
+      );
+      final Object? payload = response.data;
+      final List<dynamic> raw = payload is List
+          ? payload
+          : (ApiClient.extractMap(payload)['data'] as List? ?? <dynamic>[]);
+      return raw
+          .whereType<Map<dynamic, dynamic>>()
+          .map((Map<dynamic, dynamic> item) => FaqItem.fromApiJson(
+                Map<String, dynamic>.from(item),
+              ))
+          .toList();
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<UserProfile> updateProfile(UserProfile profile) async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.put<dynamic>(
+        '/profile',
+        options: Options(headers: await _headers()),
+        data: <String, dynamic>{
+          'name': profile.name,
+          'phone': profile.phone,
+          'email': profile.email,
+          'address': profile.address,
+        },
+      );
+      final Map<String, dynamic> body = ApiClient.extractMap(response.data);
+      final Object? json = body['user'] ?? body['profile'] ?? body;
+      if (json is! Map) return profile;
+      final Map<String, dynamic> map = Map<String, dynamic>.from(json);
+      return UserProfile(
+        id: '${map['id'] ?? profile.id}',
+        name: '${map['name'] ?? profile.name}',
+        phone: '${map['phone'] ?? profile.phone}',
+        email: map['email']?.toString(),
+        address: map['address']?.toString(),
+      );
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
 }

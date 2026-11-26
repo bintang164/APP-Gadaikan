@@ -90,18 +90,30 @@ class ProfileScreen extends StatelessWidget {
     );
 
     if (saved == true && context.mounted) {
-      await appState.updateProfile(
-        user.copyWith(
-          name: nameCtrl.text.trim(),
-          phone: phoneCtrl.text.trim(),
-          email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
-          address: addressCtrl.text.trim(),
-        ),
-      );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profil berhasil diperbarui.')),
+      try {
+        await appState.updateProfile(
+          user.copyWith(
+            name: nameCtrl.text.trim(),
+            phone: phoneCtrl.text.trim(),
+            email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
+            address: addressCtrl.text.trim(),
+          ),
         );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profil berhasil diperbarui.')),
+          );
+        }
+      } catch (error) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Gagal menyimpan profil: ${error.toString().replaceFirst('Exception: ', '')}',
+              ),
+            ),
+          );
+        }
       }
     }
   }
@@ -271,7 +283,27 @@ class ProfileScreen extends StatelessWidget {
                       'Seluruh perhitungan simulasi, penaksiran, dan pembayaran dalam prototipe frontend ini bersifat simulasi akademik dan bukan penawaran kredit atau transaksi keuangan resmi.',
                     ),
                   ),
+                  const Divider(),
+                  _ProfileTile(
+                    icon: Icons.info_outline_rounded,
+                    title: 'Tentang Gadaikan',
+                    onTap: () => _showPolicyDialog(
+                      context,
+                      'Tentang Gadaikan',
+                      'Gadaikan adalah prototipe akademik pengajuan gadai digital '
+                      'untuk elektronik, emas, dan BPKB. Aplikasi ini tidak '
+                      'terhubung ke lembaga gadai atau layanan pembayaran resmi '
+                      'tanpa integrasi yang sah.',
+                    ),
+                  ),
                 ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const Center(
+              child: Text(
+                'Foto profil opsional belum tersedia pada prototipe ini.',
+                style: AppTextStyles.caption,
               ),
             ),
             const SizedBox(height: AppSpacing.lg),

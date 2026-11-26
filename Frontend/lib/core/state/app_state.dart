@@ -22,6 +22,10 @@ class AppState extends ChangeNotifier {
   String _historyFilter = 'all';
   bool _isLoadingInfo = false;
   String? _infoError;
+  bool _isLoadingNotifications = false;
+  String? _notificationsError;
+  bool _isLoadingFaqs = false;
+  String? _faqError;
   List<PawnTransaction> _transactions = const [];
   List<OutletInfo> _outlets = const [];
   List<PromoInfo> _promotions = const [];
@@ -48,6 +52,10 @@ class AppState extends ChangeNotifier {
   String get historyFilter => _historyFilter;
   bool get isLoadingInfo => _isLoadingInfo;
   String? get infoError => _infoError;
+  bool get isLoadingNotifications => _isLoadingNotifications;
+  String? get notificationsError => _notificationsError;
+  bool get isLoadingFaqs => _isLoadingFaqs;
+  String? get faqError => _faqError;
   List<PawnTransaction> get transactions => _transactions;
   List<OutletInfo> get outlets => _outlets;
   List<PromoInfo> get promotions => _promotions;
@@ -189,6 +197,44 @@ class AppState extends ChangeNotifier {
       _infoError = error.toString().replaceFirst('Exception: ', '');
     } finally {
       _isLoadingInfo = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadNotifications() async {
+    _isLoadingNotifications = true;
+    _notificationsError = null;
+    notifyListeners();
+    try {
+      _notifications = await _repository.getNotifications();
+    } catch (error) {
+      _notificationsError = error.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _isLoadingNotifications = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    try {
+      await _repository.markAllNotificationsRead();
+      await loadNotifications();
+    } catch (error) {
+      _notificationsError = error.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadFaqs() async {
+    _isLoadingFaqs = true;
+    _faqError = null;
+    notifyListeners();
+    try {
+      _faqs = await _repository.getFaqs();
+    } catch (error) {
+      _faqError = error.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _isLoadingFaqs = false;
       notifyListeners();
     }
   }
