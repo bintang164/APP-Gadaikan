@@ -16,6 +16,12 @@ class AppState extends ChangeNotifier {
   bool _isLoadingApplications = false;
   String? _applicationListError;
   String _applicationFilter = 'all';
+  PagedHistory? _historyPage;
+  bool _isLoadingHistory = false;
+  String? _historyError;
+  String _historyFilter = 'all';
+  bool _isLoadingInfo = false;
+  String? _infoError;
   List<PawnTransaction> _transactions = const [];
   List<OutletInfo> _outlets = const [];
   List<PromoInfo> _promotions = const [];
@@ -36,6 +42,12 @@ class AppState extends ChangeNotifier {
   bool get isLoadingApplications => _isLoadingApplications;
   String? get applicationListError => _applicationListError;
   String get applicationFilter => _applicationFilter;
+  PagedHistory? get historyPage => _historyPage;
+  bool get isLoadingHistory => _isLoadingHistory;
+  String? get historyError => _historyError;
+  String get historyFilter => _historyFilter;
+  bool get isLoadingInfo => _isLoadingInfo;
+  String? get infoError => _infoError;
   List<PawnTransaction> get transactions => _transactions;
   List<OutletInfo> get outlets => _outlets;
   List<PromoInfo> get promotions => _promotions;
@@ -116,6 +128,69 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
     return detail;
+  }
+
+  Future<void> loadHistoryPage({
+    String? filter,
+    int page = 1,
+    bool append = false,
+  }) async {
+    final String resolved = filter ?? _historyFilter;
+    _historyFilter = resolved;
+    _isLoadingHistory = true;
+    _historyError = null;
+    notifyListeners();
+    try {
+      final PagedHistory result = await _repository.getHistoryPage(
+        filter: resolved,
+        page: page,
+      );
+      final List<HistoryItem> merged = append && page > 1
+          ? <HistoryItem>[..._historyPage?.items ?? <HistoryItem>[], ...result.items]
+          : result.items;
+      _historyPage = PagedHistory(
+        items: merged,
+        page: result.page,
+        perPage: result.perPage,
+        total: result.total,
+        isDemo: result.isDemo,
+      );
+    } catch (error) {
+      _historyError = error.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _isLoadingHistory = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setHistoryFilter(String filter) async {
+    await loadHistoryPage(filter: filter, page: 1);
+  }
+
+  Future<void> loadMoreHistory() async {
+    final PagedHistory? current = _historyPage;
+    if (current == null || !current.hasMore || _isLoadingHistory) return;
+    await loadHistoryPage(page: current.page + 1, append: true);
+  }
+
+  /// Memuat ulang outlet & promo dari API/admin.
+  Future<void> loadInfoData() async {
+    _isLoadingInfo = true;
+    _infoError = null;
+    notifyListeners();
+    try {
+      final List<Object> results = await Future.wait<Object>(<Future<Object>>[
+        _repository.getOutlets(),
+        _repository.getPromotions(),
+      ]);
+      _outlets = results[0] as List<OutletInfo>;
+      _promotions = results[1] as List<PromoInfo>;
+    } catch (error) {
+      _infoError = error.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _isLoadingInfo = false;
+      notifyListeners();
+    }
   }
 
   Future<void> setApplicationFilter(String status) async {

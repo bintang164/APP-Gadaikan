@@ -691,6 +691,53 @@ class SimulationResult {
   final double plafonPercentage;
 }
 
+enum HistoryKind { application, transaction }
+
+/// Satu entri riwayat gabungan (pengajuan atau transaksi).
+class HistoryItem {
+  const HistoryItem({
+    required this.id,
+    required this.kind,
+    required this.code,
+    required this.title,
+    required this.category,
+    required this.date,
+    required this.statusLabel,
+    required this.statusTone,
+    this.amountLabel,
+    this.isDemo = false,
+  });
+
+  final String id;
+  final HistoryKind kind;
+  final String code;
+  final String title;
+  final PawnCategory category;
+  final DateTime date;
+  final String statusLabel;
+  final StatusTone statusTone;
+  final String? amountLabel;
+  final bool isDemo;
+}
+
+class PagedHistory {
+  const PagedHistory({
+    required this.items,
+    required this.page,
+    required this.perPage,
+    required this.total,
+    this.isDemo = false,
+  });
+
+  final List<HistoryItem> items;
+  final int page;
+  final int perPage;
+  final int total;
+  final bool isDemo;
+
+  bool get hasMore => page * perPage < total;
+}
+
 class OutletInfo {
   const OutletInfo({
     required this.id,
@@ -699,6 +746,9 @@ class OutletInfo {
     required this.city,
     required this.hours,
     required this.phone,
+    this.latitude,
+    this.longitude,
+    this.isDemo = false,
   });
 
   final String id;
@@ -707,6 +757,32 @@ class OutletInfo {
   final String city;
   final String hours;
   final String phone;
+  final double? latitude;
+  final double? longitude;
+  final bool isDemo;
+
+  /// Peta hanya boleh dibuka bila koordinat valid DAN ada integrasi.
+  bool get hasValidCoordinates =>
+      latitude != null &&
+      longitude != null &&
+      latitude! >= -90 &&
+      latitude! <= 90 &&
+      longitude! >= -180 &&
+      longitude! <= 180;
+
+  factory OutletInfo.fromApiJson(Map<String, dynamic> json) {
+    return OutletInfo(
+      id: '${json['id'] ?? ''}',
+      name: '${json['name'] ?? ''}',
+      address: '${json['address'] ?? ''}',
+      city: '${json['city'] ?? ''}',
+      hours: '${json['hours'] ?? json['operational_hours'] ?? ''}',
+      phone: '${json['phone'] ?? ''}',
+      latitude: json['latitude'] is num ? (json['latitude'] as num).toDouble() : null,
+      longitude: json['longitude'] is num ? (json['longitude'] as num).toDouble() : null,
+      isDemo: json['is_demo'] == true,
+    );
+  }
 }
 
 class PromoInfo {
@@ -717,6 +793,7 @@ class PromoInfo {
     required this.summary,
     required this.terms,
     this.badgeText = 'Simulasi Demo',
+    this.isDemo = false,
   });
 
   final String id;
@@ -725,6 +802,19 @@ class PromoInfo {
   final String summary;
   final String terms;
   final String badgeText;
+  final bool isDemo;
+
+  factory PromoInfo.fromApiJson(Map<String, dynamic> json) {
+    return PromoInfo(
+      id: '${json['id'] ?? ''}',
+      title: '${json['title'] ?? ''}',
+      period: '${json['period'] ?? ''}',
+      summary: '${json['summary'] ?? json['description'] ?? ''}',
+      terms: '${json['terms'] ?? ''}',
+      badgeText: '${json['badge_text'] ?? 'Informasi'}',
+      isDemo: json['is_demo'] == true,
+    );
+  }
 }
 
 class AppNotification {

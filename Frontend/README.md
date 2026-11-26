@@ -3,12 +3,12 @@
 Aplikasi pengajuan gadai digital untuk prototipe akademik. Dibangun dengan
 Flutter (Android) dan disiapkan untuk backend Laravel REST API.
 
-> **Status:** Prompt 01–16 selesai: design system, splash & onboarding,
+> **Status:** Prompt 01–18 selesai: design system, splash & onboarding,
 > autentikasi, Home Dashboard, form Elektronik/Emas/BPKB, upload dokumen,
 > simulasi, review & kirim, daftar berfilter, detail + timeline status,
-> panel admin web terpisah, penaksiran/penawaran, dan detail transaksi +
-> pembayaran demo. Backend Laravel belum tersedia; mode demo diberi label
-> dan tidak mengklaim data tersimpan di server.
+> panel admin web terpisah, penaksiran/penawaran, pembayaran demo, riwayat
+> berpagination, serta outlet & promo. Backend Laravel belum tersedia; mode
+> demo diberi label dan tidak mengklaim data tersimpan di server.
 
 ## Fitur yang sudah berjalan
 
@@ -76,7 +76,14 @@ Flutter (Android) dan disiapkan untuk backend Laravel REST API.
   nasabah): dashboard, pencarian/filter/pagination, detail terotorisasi,
   form penaksiran, aksi revisi/proses/setujui/tolak dengan alasan wajib,
   peran admin.
-- Riwayat, outlet, promo, notifikasi, dan FAQ (mode demo berlabel).
+- **Riwayat transaksi**: filter Semua/Pengajuan/Aktif/Lunas/Ditolak,
+  pagination + "Muat Lebih Banyak", refresh, empty state ke pengajuan baru,
+  dan detail. Data diambil dengan token pengguna yang sedang login.
+- **Outlet & promo**: data dari endpoint admin/API, banner promo orisinal,
+  syarat & ketentuan, detail, loading/empty/error, dan label DEMO untuk
+  seed data. Tidak ada outlet/promo resmi fiktif; tombol peta tidak
+  ditampilkan karena integrasi belum tersedia.
+- Notifikasi dan FAQ (mode demo berlabel).
 - Theme terpusat Navy Blue + Gold dengan komponen reusable.
 
 ## Yang belum dibuat
@@ -169,7 +176,7 @@ flutter build apk --debug
 Status terakhir:
 
 - `flutter analyze`: tidak ada issue.
-- `flutter test`: **39 test lulus** (auth, form, upload/simulasi, submit/daftar, detail/status, penawaran/pembayaran, widget).
+- `flutter test`: **44 test lulus** (auth, form, upload/simulasi, submit/daftar, detail/status, penawaran/pembayaran, riwayat/info, widget).
 - `flutter build web --release`: berhasil.
 - `flutter build apk --debug`: berhasil.
 

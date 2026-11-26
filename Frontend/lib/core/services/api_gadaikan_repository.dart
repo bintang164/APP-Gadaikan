@@ -4,6 +4,7 @@ import '../auth/auth_repository.dart';
 import '../models/gadaikan_models.dart';
 import '../network/api_client.dart';
 import '../network/api_error_mapper.dart';
+import '../utils/formatters.dart';
 import 'gadaikan_repository.dart';
 
 /// Repository pengajuan yang benar-benar memanggil Laravel.
@@ -280,6 +281,138 @@ class ApiGadaikanRepository extends MockGadaikanRepository {
       final Object? json = body['transaction'] ?? body;
       if (json is! Map) throw Exception('Server tidak mengembalikan data transaksi.');
       return PawnTransaction.fromApiJson(Map<String, dynamic>.from(json));
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<PagedHistory> getHistoryPage({
+    String filter = 'all',
+    int page = 1,
+    int perPage = 10,
+  }) async {
+    try {
+      // Dua endpoint milik pengguna yang sedang login; tidak ada data
+      // lintas akun karena token Bearer dikirim ke keduanya.
+      final PagedApplications applications = await getApplicationsPage(
+        status: null,
+        page: 1,
+        perPage: 100,
+      );
+      final List<PawnTransaction> transactions = await getTransactions();
+      final List<HistoryItem> all = <HistoryItem>[];
+
+      if (filter == 'all' || filter == 'applications' || filter == 'rejected') {
+        for (final PawnApplication app in applications.items) {
+          final bool include = filter == 'rejected'
+              ? app.status == ApplicationStatus.rejected ||
+                  app.status == ApplicationStatus.offerDeclined ||
+                  app.status == ApplicationStatus.cancelled
+              : true;
+          if (include) {
+            all.add(
+              HistoryItem(
+                id: app.id,
+                kind: HistoryKind.application,
+                code: app.code,
+                title: app.itemTitle,
+                category: app.category,
+                date: app.updatedAt,
+                statusLabel: app.status.label,
+                statusTone: app.status.tone,
+                amountLabel: app.assessment != null
+                    ? AppFormatters.formatRupiah(app.assessment!.approvedPrincipal)
+                    : null,
+              ),
+            );
+          }
+        }
+      }
+
+      if (filter != 'applications') {
+        for (final PawnTransaction trx in transactions) {
+          final bool include = switch (filter) {
+            'active' => trx.status == TransactionStatus.active ||
+                trx.status == TransactionStatus.paymentPending ||
+                trx.status == TransactionStatus.overdue,
+            'paid_off' => trx.status == TransactionStatus.paidOff ||
+                trx.status == TransactionStatus.closed,
+            'rejected' => false,
+            _ => true,
+          };
+          if (include) {
+            all.add(
+              HistoryItem(
+                id: trx.id,
+                kind: HistoryKind.transaction,
+                code: trx.code,
+                title: trx.itemTitle,
+                category: trx.category,
+                date: trx.startDate,
+                statusLabel: trx.status.label,
+                statusTone: trx.status.tone,
+                amountLabel: AppFormatters.formatRupiah(trx.principalAmount),
+              ),
+            );
+          }
+        }
+      }
+
+      all.sort((HistoryItem a, HistoryItem b) => b.date.compareTo(a.date));
+      final int start = ((page < 1 ? 1 : page) - 1) * perPage;
+      return PagedHistory(
+        items: start >= all.length
+            ? <HistoryItem>[]
+            : all.skip(start).take(perPage).toList(),
+        page: page < 1 ? 1 : page,
+        perPage: perPage,
+        total: all.length,
+      );
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<List<OutletInfo>> getOutlets() async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.get<dynamic>(
+        '/outlets',
+        options: Options(headers: await _headers()),
+      );
+      final Object? payload = response.data;
+      final List<dynamic> raw = payload is List
+          ? payload
+          : (ApiClient.extractMap(payload)['data'] as List? ?? <dynamic>[]);
+      return raw
+          .whereType<Map<dynamic, dynamic>>()
+          .map((Map<dynamic, dynamic> item) => OutletInfo.fromApiJson(
+                Map<String, dynamic>.from(item),
+              ))
+          .toList();
+    } on DioException catch (error) {
+      throw Exception(ApiErrorMapper.messageFor(error));
+    }
+  }
+
+  @override
+  Future<List<PromoInfo>> getPromotions() async {
+    try {
+      final Response<dynamic> response = await _apiClient.dio.get<dynamic>(
+        '/promotions',
+        options: Options(headers: await _headers()),
+      );
+      final Object? payload = response.data;
+      final List<dynamic> raw = payload is List
+          ? payload
+          : (ApiClient.extractMap(payload)['data'] as List? ?? <dynamic>[]);
+      return raw
+          .whereType<Map<dynamic, dynamic>>()
+          .map((Map<dynamic, dynamic> item) => PromoInfo.fromApiJson(
+                Map<String, dynamic>.from(item),
+              ))
+          .toList();
     } on DioException catch (error) {
       throw Exception(ApiErrorMapper.messageFor(error));
     }

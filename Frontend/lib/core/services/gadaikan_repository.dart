@@ -1,6 +1,7 @@
 import '../auth/auth_repository.dart';
 import '../models/auth_user.dart';
 import '../models/gadaikan_models.dart';
+import '../utils/formatters.dart';
 
 /// Abstraction for Gadaikan data operations.
 /// Currently backed by [MockGadaikanRepository]; ready to swap with Laravel REST API.
@@ -52,6 +53,13 @@ abstract class GadaikanRepository {
 
   Future<List<PawnTransaction>> getTransactions();
   Future<PawnTransaction> getTransactionDetail(String id);
+
+  /// Riwayat gabungan pengajuan + transaksi milik pengguna aktif.
+  Future<PagedHistory> getHistoryPage({
+    String filter = 'all',
+    int page = 1,
+    int perPage = 10,
+  });
   Future<PawnTransaction> recordDemoPayment({
     required String transactionId,
     required double amount,
@@ -660,6 +668,86 @@ class MockGadaikanRepository implements GadaikanRepository {
   }
 
   @override
+  Future<PagedHistory> getHistoryPage({
+    String filter = 'all',
+    int page = 1,
+    int perPage = 10,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 280));
+    final List<HistoryItem> all = <HistoryItem>[];
+
+    if (filter == 'all' || filter == 'applications' || filter == 'rejected') {
+      for (final PawnApplication app in _applications) {
+        final bool include = filter == 'rejected'
+            ? app.status == ApplicationStatus.rejected ||
+                app.status == ApplicationStatus.offerDeclined ||
+                app.status == ApplicationStatus.cancelled
+            : true;
+        if (include) {
+          all.add(
+            HistoryItem(
+              id: app.id,
+              kind: HistoryKind.application,
+              code: app.code,
+              title: app.itemTitle,
+              category: app.category,
+              date: app.updatedAt,
+              statusLabel: app.status.label,
+              statusTone: app.status.tone,
+              amountLabel: app.assessment != null
+                  ? AppFormatters.formatRupiah(app.assessment!.approvedPrincipal)
+                  : null,
+              isDemo: true,
+            ),
+          );
+        }
+      }
+    }
+
+    if (filter != 'applications') {
+      for (final PawnTransaction trx in _transactions) {
+        final bool include = switch (filter) {
+          'active' => trx.status == TransactionStatus.active ||
+              trx.status == TransactionStatus.paymentPending ||
+              trx.status == TransactionStatus.overdue,
+          'paid_off' => trx.status == TransactionStatus.paidOff ||
+              trx.status == TransactionStatus.closed,
+          'rejected' => false,
+          _ => true,
+        };
+        if (include) {
+          all.add(
+            HistoryItem(
+              id: trx.id,
+              kind: HistoryKind.transaction,
+              code: trx.code,
+              title: trx.itemTitle,
+              category: trx.category,
+              date: trx.startDate,
+              statusLabel: trx.status.label,
+              statusTone: trx.status.tone,
+              amountLabel: AppFormatters.formatRupiah(trx.principalAmount),
+              isDemo: true,
+            ),
+          );
+        }
+      }
+    }
+
+    all.sort((HistoryItem a, HistoryItem b) => b.date.compareTo(a.date));
+    final int start = ((page < 1 ? 1 : page) - 1) * perPage;
+    return PagedHistory(
+      items: start >= all.length
+          ? <HistoryItem>[]
+          : all.skip(start).take(perPage).toList(),
+      page: page < 1 ? 1 : page,
+      perPage: perPage,
+      total: all.length,
+      isDemo: true,
+    );
+  }
+
+  @override
   Future<PawnTransaction> recordDemoPayment({
     required String transactionId,
     required double amount,
@@ -702,6 +790,7 @@ class MockGadaikanRepository implements GadaikanRepository {
         city: 'Jakarta Selatan',
         hours: 'Senin - Sabtu, 08.30 - 16.30 WIB',
         phone: '(021) 555-0101',
+        isDemo: true,
       ),
       OutletInfo(
         id: 'out-2',
@@ -710,6 +799,7 @@ class MockGadaikanRepository implements GadaikanRepository {
         city: 'Bandung',
         hours: 'Senin - Jumat, 08.30 - 16.00 WIB',
         phone: '(022) 555-0142',
+        isDemo: true,
       ),
       OutletInfo(
         id: 'out-3',
@@ -718,6 +808,7 @@ class MockGadaikanRepository implements GadaikanRepository {
         city: 'Surabaya',
         hours: 'Senin - Sabtu, 09.00 - 17.00 WIB',
         phone: '(031) 555-0199',
+        isDemo: true,
       ),
     ];
   }
@@ -734,6 +825,7 @@ class MockGadaikanRepository implements GadaikanRepository {
             'Simulasi potongan biaya layanan periode pertama untuk pengajuan kategori Elektronik dan Emas.',
         terms:
             'Berlaku pada mode simulasi demo untuk tenor minimal 30 hari. Tidak dapat digabungkan dengan promo lain.',
+        isDemo: true,
       ),
       PromoInfo(
         id: 'promo-2',
@@ -743,6 +835,7 @@ class MockGadaikanRepository implements GadaikanRepository {
             'Dokumen kendaraan diverifikasi secara privat dengan estimasi respon maksimal 1 hari kerja.',
         terms:
             'Pastikan foto BPKB dan kendaraan jelas serta sesuai nama pemilik dokumen.',
+        isDemo: true,
       ),
     ];
   }

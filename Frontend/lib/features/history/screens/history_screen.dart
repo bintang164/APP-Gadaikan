@@ -3,14 +3,13 @@ import '../../../core/models/gadaikan_models.dart';
 import '../../../core/state/app_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/app_buttons.dart';
 import '../../../core/widgets/state_views.dart';
-import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/transaction_list_tile.dart';
 import '../../pawn/screens/application_detail_screen.dart';
 import '../../transactions/screens/transaction_detail_screen.dart';
-
-enum _HistoryFilter { all, applications, active, completed }
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({
@@ -25,160 +24,181 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  _HistoryFilter _filter = _HistoryFilter.all;
+  static const List<_Filter> _filters = <_Filter>[
+    _Filter(key: 'all', label: 'Semua'),
+    _Filter(key: 'applications', label: 'Pengajuan'),
+    _Filter(key: 'active', label: 'Aktif'),
+    _Filter(key: 'paid_off', label: 'Lunas'),
+    _Filter(key: 'rejected', label: 'Ditolak / Dibatalkan'),
+  ];
+
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      AppStateScope.of(context).loadHistoryPage(filter: 'all', page: 1);
+    });
+  }
+
+  void _openDetail(HistoryItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => item.kind == HistoryKind.application
+            ? ApplicationDetailScreen(applicationId: item.id)
+            : TransactionDetailScreen(transactionId: item.id),
+      ),
+    );
+  }
+
+  Future<void> _refresh(AppState state) async {
+    await state.loadHistoryPage(filter: state.historyFilter, page: 1);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final appState = AppStateScope.of(context);
-    final entries = <_HistoryEntry>[];
-
-    if (_filter == _HistoryFilter.all || _filter == _HistoryFilter.applications) {
-      for (final app in appState.applications) {
-        entries.add(
-          _HistoryEntry(
-            code: app.code,
-            title: app.itemTitle,
-            categoryLabel: app.category.label,
-            categoryIcon: app.category.icon,
-            date: app.updatedAt,
-            statusLabel: app.status.label,
-            statusTone: app.status.tone,
-            amountLabel: app.assessment != null
-                ? AppFormatters.formatRupiah(app.assessment!.approvedPrincipal)
-                : null,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) =>
-                      ApplicationDetailScreen(applicationId: app.id),
-                ),
-              );
-            },
-          ),
-        );
-      }
-    }
-
-    for (final trx in appState.transactions) {
-      final isActive = trx.status == TransactionStatus.active ||
-          trx.status == TransactionStatus.paymentPending ||
-          trx.status == TransactionStatus.overdue;
-      final isDone = trx.status == TransactionStatus.paidOff ||
-          trx.status == TransactionStatus.closed;
-
-      final include = switch (_filter) {
-        _HistoryFilter.all => true,
-        _HistoryFilter.applications => false,
-        _HistoryFilter.active => isActive,
-        _HistoryFilter.completed => isDone,
-      };
-
-      if (include) {
-        entries.add(
-          _HistoryEntry(
-            code: trx.code,
-            title: trx.itemTitle,
-            categoryLabel: trx.category.label,
-            categoryIcon: trx.category.icon,
-            date: trx.startDate,
-            statusLabel: trx.status.label,
-            statusTone: trx.status.tone,
-            amountLabel: AppFormatters.formatRupiah(trx.principalAmount),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) =>
-                      TransactionDetailScreen(transactionId: trx.id),
-                ),
-              );
-            },
-          ),
-        );
-      }
-    }
-
-    entries.sort((a, b) => b.date.compareTo(a.date));
+    final AppState state = AppStateScope.of(context);
+    final PagedHistory? page = state.historyPage;
+    final List<HistoryItem> items = page?.items ?? const <HistoryItem>[];
+    final bool initialLoading = state.isLoadingHistory && page == null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Riwayat')),
+      appBar: AppBar(
+        title: const Text('Riwayat'),
+        actions: [
+          IconButton(
+            onPressed: () => _refresh(state),
+            tooltip: 'Muat ulang riwayat',
+            icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: appState.refreshAllData,
-          color: AppColors.primary,
-          child: Column(
-            children: [
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
+        child: Column(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.screenHorizontal,
+                vertical: AppSpacing.sm + 4,
+              ),
+              child: Row(
+                children: [
+                  for (final _Filter filter in _filters) ...[
+                    ChoiceChip(
+                      label: Text(filter.label),
+                      selected: state.historyFilter == filter.key,
+                      selectedColor: AppColors.primary,
+                      labelStyle: TextStyle(
+                        color: state.historyFilter == filter.key
+                            ? Colors.white
+                            : AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      onSelected: (_) {
+                        state.setHistoryFilter(filter.key);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ],
+              ),
+            ),
+            if (page?.isDemo ?? false)
+              Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.screenHorizontal,
-                  vertical: AppSpacing.sm + 4,
                 ),
-                child: Row(
-                  children: [
-                    _Chip(
-                      label: 'Semua',
-                      selected: _filter == _HistoryFilter.all,
-                      onTap: () => setState(() => _filter = _HistoryFilter.all),
-                    ),
-                    const SizedBox(width: 8),
-                    _Chip(
-                      label: 'Pengajuan',
-                      selected: _filter == _HistoryFilter.applications,
-                      onTap: () => setState(
-                          () => _filter = _HistoryFilter.applications),
-                    ),
-                    const SizedBox(width: 8),
-                    _Chip(
-                      label: 'Aktif',
-                      selected: _filter == _HistoryFilter.active,
-                      onTap: () =>
-                          setState(() => _filter = _HistoryFilter.active),
-                    ),
-                    const SizedBox(width: 8),
-                    _Chip(
-                      label: 'Selesai',
-                      selected: _filter == _HistoryFilter.completed,
-                      onTap: () =>
-                          setState(() => _filter = _HistoryFilter.completed),
-                    ),
-                  ],
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Mode demo: riwayat ini berasal dari data lokal, bukan server.',
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.warning),
+                  ),
                 ),
               ),
-              Expanded(
-                child: entries.isEmpty
-                    ? EmptyState(
-                        icon: Icons.history_toggle_off_rounded,
-                        title: 'Belum Ada Riwayat',
-                        subtitle:
-                            'Riwayat pengajuan dan transaksi gadai Anda akan muncul di sini.',
-                        actionLabel: 'Buat Pengajuan',
-                        onAction: widget.onStartNewApplication,
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.screenHorizontal,
-                          vertical: AppSpacing.sm,
-                        ),
-                        itemCount: entries.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: AppSpacing.sm + 4),
-                        itemBuilder: (context, index) {
-                          final item = entries[index];
-                          return TransactionListTile(
-                            code: item.code,
-                            title: item.title,
-                            categoryLabel: item.categoryLabel,
-                            categoryIcon: item.categoryIcon,
-                            dateLabel: AppFormatters.formatDate(item.date),
-                            statusLabel: item.statusLabel,
-                            statusTone: item.statusTone,
-                            amountLabel: item.amountLabel,
-                            onTap: item.onTap,
-                          );
-                        },
-                      ),
-              ),
-            ],
+            Expanded(
+              child: initialLoading
+                  ? const LoadingView(message: 'Memuat riwayat...')
+                  : state.historyError != null
+                      ? ErrorState(
+                          message: state.historyError!,
+                          onRetry: () => state.loadHistoryPage(page: 1),
+                        )
+                      : items.isEmpty && !state.isLoadingHistory
+                          ? EmptyState(
+                              icon: Icons.history_toggle_off_rounded,
+                              title: 'Belum Ada Riwayat',
+                              subtitle:
+                                  'Riwayat pengajuan dan transaksi akun Anda akan muncul di sini.',
+                              actionLabel: 'Buat Pengajuan',
+                              onAction: widget.onStartNewApplication,
+                            )
+                          : RefreshIndicator(
+                              onRefresh: () => _refresh(state),
+                              color: AppColors.primary,
+                              child: ListView.separated(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.screenHorizontal,
+                                  vertical: AppSpacing.sm,
+                                ),
+                                itemCount: items.length + 1,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: AppSpacing.sm + 4),
+                                itemBuilder: (context, index) {
+                                  if (index == items.length) {
+                                    return _buildFooter(state, page!);
+                                  }
+                                  final HistoryItem item = items[index];
+                                  return TransactionListTile(
+                                    code: item.code,
+                                    title: item.title,
+                                    categoryLabel: item.category.label,
+                                    categoryIcon: item.category.icon,
+                                    dateLabel:
+                                        AppFormatters.formatDate(item.date),
+                                    statusLabel: item.statusLabel,
+                                    statusTone: item.statusTone,
+                                    amountLabel: item.amountLabel,
+                                    onTap: () => _openDetail(item),
+                                  );
+                                },
+                              ),
+                            ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooter(AppState state, PagedHistory page) {
+    if (!page.hasMore) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+        child: Center(
+          child: Text(
+            'Menampilkan ${page.items.length} dari ${page.total} riwayat',
+            style: AppTextStyles.caption,
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: Center(
+        child: SizedBox(
+          width: 220,
+          child: SecondaryButton(
+            label: state.isLoadingHistory ? 'Memuat...' : 'Muat Lebih Banyak',
+            isLoading: state.isLoadingHistory,
+            onPressed: state.isLoadingHistory ? null : state.loadMoreHistory,
           ),
         ),
       ),
@@ -186,53 +206,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+class _Filter {
+  const _Filter({required this.key, required this.label});
 
+  final String key;
   final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      selectedColor: AppColors.primary,
-      labelStyle: TextStyle(
-        color: selected ? Colors.white : AppColors.textPrimary,
-        fontWeight: FontWeight.w600,
-        fontSize: 13,
-      ),
-      onSelected: (_) => onTap(),
-    );
-  }
-}
-
-class _HistoryEntry {
-  const _HistoryEntry({
-    required this.code,
-    required this.title,
-    required this.categoryLabel,
-    required this.categoryIcon,
-    required this.date,
-    required this.statusLabel,
-    required this.statusTone,
-    required this.onTap,
-    this.amountLabel,
-  });
-
-  final String code;
-  final String title;
-  final String categoryLabel;
-  final IconData categoryIcon;
-  final DateTime date;
-  final String statusLabel;
-  final StatusTone statusTone;
-  final VoidCallback onTap;
-  final String? amountLabel;
 }
