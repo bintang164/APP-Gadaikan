@@ -42,16 +42,23 @@ class TransactionListTile extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                code,
-                style: AppTextStyles.captionBold.copyWith(
-                  color: AppColors.primary,
+              Expanded(
+                child: Text(
+                  code,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.captionBold.copyWith(
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
-              StatusBadge(
-                label: statusLabel,
-                tone: statusTone,
-                compact: true,
+              const SizedBox(width: AppSpacing.xs),
+              Flexible(
+                child: StatusBadge(
+                  label: statusLabel,
+                  tone: statusTone,
+                  compact: true,
+                ),
               ),
             ],
           ),
@@ -94,20 +101,26 @@ class TransactionListTile extends StatelessWidget {
               ),
               if (amountLabel != null) ...[
                 const SizedBox(width: AppSpacing.sm),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      amountLabel!,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.primary,
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        amountLabel!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.primary,
+                        ),
                       ),
-                    ),
-                    Text(
-                      dateLabel,
-                      style: AppTextStyles.caption.copyWith(fontSize: 11),
-                    ),
-                  ],
+                      Text(
+                        dateLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption.copyWith(fontSize: 11),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ],

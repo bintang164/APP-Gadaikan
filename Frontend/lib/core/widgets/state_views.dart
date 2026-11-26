@@ -57,43 +57,45 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                color: AppColors.primarySoft,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(icon, size: 32, color: AppColors.primary),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              title,
-              style: AppTextStyles.sectionHeading,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              subtitle,
-              style: AppTextStyles.bodySecondary,
-              textAlign: TextAlign.center,
-            ),
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: AppSpacing.lg),
-              SizedBox(
-                width: 220,
-                child: PrimaryButton(
-                  label: actionLabel!,
-                  onPressed: onAction,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(20),
                 ),
+                child: Icon(icon, size: 32, color: AppColors.primary),
               ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                title,
+                style: AppTextStyles.sectionHeading,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                subtitle,
+                style: AppTextStyles.bodySecondary,
+                textAlign: TextAlign.center,
+              ),
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: 220,
+                  child: PrimaryButton(
+                    label: actionLabel!,
+                    onPressed: onAction,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -116,46 +118,48 @@ class ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                color: AppColors.dangerSoft,
-                borderRadius: BorderRadius.circular(20),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: AppColors.dangerSoft,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.error_outline_rounded,
+                  size: 32,
+                  color: AppColors.danger,
+                ),
               ),
-              child: const Icon(
-                Icons.error_outline_rounded,
-                size: 32,
-                color: AppColors.danger,
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                title,
+                style: AppTextStyles.sectionHeading,
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              title,
-              style: AppTextStyles.sectionHeading,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              message,
-              style: AppTextStyles.bodySecondary,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            SizedBox(
-              width: 180,
-              child: SecondaryButton(
-                label: 'Coba Lagi',
-                icon: Icons.refresh_rounded,
-                onPressed: onRetry,
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                message,
+                style: AppTextStyles.bodySecondary,
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.lg),
+              SizedBox(
+                width: 180,
+                child: SecondaryButton(
+                  label: 'Coba Lagi',
+                  icon: Icons.refresh_rounded,
+                  onPressed: onRetry,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

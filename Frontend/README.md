@@ -184,7 +184,7 @@ flutter build apk --debug
 Status terakhir:
 
 - `flutter analyze`: tidak ada issue.
-- `flutter test`: **50 test lulus** (auth, form, upload/simulasi, submit/daftar, detail/status, penawaran/pembayaran, riwayat/info, notifikasi/profil, widget).
+- `flutter test`: **112 test lulus** (termasuk 62 test QA overflow/navigasi pada 4 ukuran layar).
 - `flutter build web --release`: berhasil.
 - `flutter build apk --debug`: berhasil.
 

@@ -325,15 +325,22 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        trx.code,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.primary,
+                      Expanded(
+                        child: Text(
+                          trx.code,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
-                      StatusBadge(
-                        label: trx.status.label,
-                        tone: trx.status.tone,
+                      const SizedBox(width: AppSpacing.xs),
+                      Flexible(
+                        child: StatusBadge(
+                          label: trx.status.label,
+                          tone: trx.status.tone,
+                        ),
                       ),
                     ],
                   ),
@@ -479,8 +486,26 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTextStyles.bodySecondary),
-          Text(value, style: AppTextStyles.bodyMedium),
+          Expanded(
+            flex: 4,
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodySecondary,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            flex: 6,
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodyMedium,
+            ),
+          ),
         ],
       ),
     );

@@ -1932,12 +1932,17 @@ class _StepHeader extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Langkah ${safeStep + 1} dari $totalSteps • ${titles[safeStep]}',
-                style: AppTextStyles.captionBold.copyWith(
-                  color: AppColors.primary,
+              Expanded(
+                child: Text(
+                  'Langkah ${safeStep + 1} dari $totalSteps • ${titles[safeStep]}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.captionBold.copyWith(
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
+              const SizedBox(width: AppSpacing.xs),
               Text(
                 '${(((safeStep + 1) / totalSteps) * 100).round()}%',
                 style: AppTextStyles.captionBold,

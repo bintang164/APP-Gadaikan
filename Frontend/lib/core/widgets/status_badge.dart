@@ -43,17 +43,18 @@ class StatusBadge extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(
-              color: fg,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: AppTextStyles.captionBold.copyWith(
-              color: fg,
-              fontSize: compact ? 11 : 12,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.captionBold.copyWith(
+                color: fg,
+                fontSize: compact ? 11 : 12,
+              ),
             ),
           ),
         ],

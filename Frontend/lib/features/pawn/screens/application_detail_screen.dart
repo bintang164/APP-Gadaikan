@@ -173,15 +173,22 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          app.code,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.primary,
+                        Expanded(
+                          child: Text(
+                            app.code,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
-                        StatusBadge(
-                          label: app.status.label,
-                          tone: app.status.tone,
+                        const SizedBox(width: AppSpacing.xs),
+                        Flexible(
+                          child: StatusBadge(
+                            label: app.status.label,
+                            tone: app.status.tone,
+                          ),
                         ),
                       ],
                     ),

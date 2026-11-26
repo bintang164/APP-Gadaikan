@@ -230,10 +230,13 @@ class _SimulationScreenState extends State<SimulationScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Estimasi Plafon Pinjaman',
-                        style: AppTextStyles.bodySecondary,
+                      const Expanded(
+                        child: Text(
+                          'Estimasi Plafon Pinjaman',
+                          style: AppTextStyles.bodySecondary,
+                        ),
                       ),
+                      const SizedBox(width: AppSpacing.xs),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
