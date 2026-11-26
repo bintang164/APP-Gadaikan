@@ -19,6 +19,17 @@ abstract class GadaikanRepository {
   Future<SimulationConfig> getSimulationConfig();
   Future<List<PawnCategoryInfo>> getCategories();
   Future<List<PawnApplication>> getApplications();
+
+  /// True bila data berasal dari backend (bukan mode demo lokal).
+  bool get usesBackend;
+
+  /// Daftar pengajuan dengan filter status dan pagination.
+  Future<PagedApplications> getApplicationsPage({
+    String? status,
+    int page = 1,
+    int perPage = 10,
+  });
+
   Future<PawnApplication> submitApplication({
     required PawnCategory category,
     required String itemTitle,
@@ -427,9 +438,49 @@ class MockGadaikanRepository implements GadaikanRepository {
   }
 
   @override
+  bool get usesBackend => false;
+
+  @override
   Future<List<PawnApplication>> getApplications() async {
     await Future<void>.delayed(const Duration(milliseconds: 350));
     return List<PawnApplication>.unmodifiable(_applications);
+  }
+
+  @override
+  Future<PagedApplications> getApplicationsPage({
+    String? status,
+    int page = 1,
+    int perPage = 10,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final List<PawnApplication> filtered = _applications
+        .where((PawnApplication app) => _matchesStatusFilter(app, status))
+        .toList();
+    final int start = ((page < 1 ? 1 : page) - 1) * perPage;
+    final List<PawnApplication> items = start >= filtered.length
+        ? <PawnApplication>[]
+        : filtered.skip(start).take(perPage).toList();
+    return PagedApplications(
+      items: items,
+      page: page < 1 ? 1 : page,
+      perPage: perPage,
+      total: filtered.length,
+      isDemo: true,
+    );
+  }
+
+  bool _matchesStatusFilter(PawnApplication app, String? status) {
+    if (status == null || status == 'all') return true;
+    return switch (status) {
+      'pending' => app.status == ApplicationStatus.submitted,
+      'processing' => app.status == ApplicationStatus.underReview,
+      'revision_required' => app.status == ApplicationStatus.revisionRequired,
+      'approved' => app.status == ApplicationStatus.approved ||
+          app.status == ApplicationStatus.offerAccepted,
+      'rejected' => app.status == ApplicationStatus.rejected ||
+          app.status == ApplicationStatus.offerDeclined,
+      _ => app.status.name == status,
+    };
   }
 
   @override

@@ -3,10 +3,11 @@
 Aplikasi pengajuan gadai digital untuk prototipe akademik. Dibangun dengan
 Flutter (Android) dan disiapkan untuk backend Laravel REST API.
 
-> **Status:** Prompt 01–10 selesai: design system, splash & onboarding,
+> **Status:** Prompt 01–12 selesai: design system, splash & onboarding,
 > autentikasi, Home Dashboard, pemilihan kategori, form Elektronik/Emas/BPKB,
-> upload dokumen, dan kalkulator simulasi. Backend Laravel dan beberapa
-> fitur lanjutan masih memakai mode demo berlabel.
+> upload dokumen, kalkulator simulasi, review & kirim pengajuan, serta
+> daftar pengajuan berfilter. Backend Laravel belum tersedia; mode demo
+> diberi label dan tidak mengklaim data tersimpan di server.
 
 ## Fitur yang sudah berjalan
 
@@ -50,6 +51,13 @@ Flutter (Android) dan disiapkan untuk backend Laravel REST API.
 - **Simulasi gadai**: kategori, nilai barang, tenor dari konfigurasi,
   plafon/biaya/total sesuai rumus PRD, validasi kosong/nol/angka besar,
   label "parameter demo" dan CTA lanjut pengajuan.
+- **Review & kirim**: ringkasan kategori/barang, data pemohon, berkas,
+  estimasi simulasi, pernyataan kebenaran; tombol Ubah Data tanpa menghapus
+  input; Kirim hanya aktif bila valid & disetujui; double submit dicegah;
+  nomor pengajuan berasal dari payload server (mode demo diberi label).
+- **Daftar pengajuan**: filter Semua/Menunggu/Diproses/Perlu Perbaikan/
+  Disetujui/Ditolak, pagination + "Muat Lebih Banyak", refresh, loading,
+  empty, error + retry, tap membuka detail, status tetap memakai teks.
 - Riwayat, detail transaksi, outlet, promo, notifikasi, dan FAQ (mode demo
   berlabel).
 - Theme terpusat Navy Blue + Gold dengan komponen reusable.
@@ -144,7 +152,7 @@ flutter build apk --debug
 Status terakhir:
 
 - `flutter analyze`: tidak ada issue.
-- `flutter test`: **23 test lulus** (auth, kategori/form, emas/BPKB, upload/simulasi, widget).
+- `flutter test`: **28 test lulus** (auth, form, upload/simulasi, submit/daftar, widget).
 - `flutter build web --release`: berhasil.
 - `flutter build apk --debug`: berhasil.
 

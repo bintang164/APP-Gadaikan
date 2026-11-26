@@ -12,6 +12,10 @@ class AppState extends ChangeNotifier {
   SimulationConfig? _simulationConfig;
   List<PawnCategoryInfo> _categories = const [];
   List<PawnApplication> _applications = const [];
+  PagedApplications? _applicationPage;
+  bool _isLoadingApplications = false;
+  String? _applicationListError;
+  String _applicationFilter = 'all';
   List<PawnTransaction> _transactions = const [];
   List<OutletInfo> _outlets = const [];
   List<PromoInfo> _promotions = const [];
@@ -28,6 +32,10 @@ class AppState extends ChangeNotifier {
   SimulationConfig? get simulationConfig => _simulationConfig;
   List<PawnCategoryInfo> get categories => _categories;
   List<PawnApplication> get applications => _applications;
+  PagedApplications? get applicationPage => _applicationPage;
+  bool get isLoadingApplications => _isLoadingApplications;
+  String? get applicationListError => _applicationListError;
+  String get applicationFilter => _applicationFilter;
   List<PawnTransaction> get transactions => _transactions;
   List<OutletInfo> get outlets => _outlets;
   List<PromoInfo> get promotions => _promotions;
@@ -41,6 +49,52 @@ class AppState extends ChangeNotifier {
 
   int get pendingApplicationCount =>
       _applications.where((a) => a.status.isPendingAction).length;
+
+  /// Memuat daftar pengajuan dengan filter & pagination.
+  Future<void> loadApplicationsPage({
+    String? status,
+    int page = 1,
+    bool append = false,
+  }) async {
+    final String resolvedStatus = status ?? _applicationFilter;
+    _applicationFilter = resolvedStatus;
+    _isLoadingApplications = true;
+    _applicationListError = null;
+    notifyListeners();
+    try {
+      final PagedApplications result = await _repository.getApplicationsPage(
+        status: resolvedStatus == 'all' ? null : resolvedStatus,
+        page: page,
+      );
+      final List<PawnApplication> merged = append && page > 1
+          ? <PawnApplication>[..._applicationPage?.items ?? <PawnApplication>[], ...result.items]
+          : result.items;
+      _applicationPage = PagedApplications(
+        items: merged,
+        page: result.page,
+        perPage: result.perPage,
+        total: result.total,
+        isDemo: result.isDemo,
+      );
+      if (!append || page <= 1) _applications = merged;
+    } catch (error) {
+      _applicationListError =
+          error.toString().replaceFirst('Exception: ', '');
+    } finally {
+      _isLoadingApplications = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setApplicationFilter(String status) async {
+    await loadApplicationsPage(status: status, page: 1);
+  }
+
+  Future<void> loadMoreApplications() async {
+    final PagedApplications? current = _applicationPage;
+    if (current == null || !current.hasMore || _isLoadingApplications) return;
+    await loadApplicationsPage(page: current.page + 1, append: true);
+  }
 
   void completeOnboarding() {
     _hasSeenOnboarding = true;
@@ -244,5 +298,12 @@ class AppStateScope extends InheritedNotifier<AppState> {
     final scope = context.dependOnInheritedWidgetOfExactType<AppStateScope>();
     assert(scope != null, 'AppStateScope not found in widget tree.');
     return scope!.notifier!;
+  }
+
+  /// Aman dipakai dari widget yang mungkin berada di route overlay.
+  static AppState? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<AppStateScope>()
+        ?.notifier;
   }
 }

@@ -3,6 +3,7 @@ import 'core/auth/api_auth_service.dart';
 import 'core/auth/auth_repository.dart';
 import 'core/auth/mock_auth_service.dart';
 import 'core/config/app_config.dart';
+import 'core/services/api_gadaikan_repository.dart';
 import 'core/services/gadaikan_repository.dart';
 import 'core/storage/local_storage.dart';
 import 'core/storage/session_store.dart';
@@ -41,7 +42,10 @@ class GadaikanApp extends StatefulWidget {
       sessionStore: SecureSessionStore(),
       localStorage: localStorage,
     );
-    return MockGadaikanRepository(authRepository: authRepository);
+    if (AppConfig.useMockAuth) {
+      return MockGadaikanRepository(authRepository: authRepository);
+    }
+    return ApiGadaikanRepository(authRepository: authRepository);
   }
 
   final GadaikanRepository repository;

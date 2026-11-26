@@ -300,6 +300,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
                           initialCategory: _selectedCategory,
                           initialEstimatedValue: _estimatedValue,
                           initialTenorDays: _selectedTenor,
+                          initialSimulationResult: result,
                         ),
                       ),
                     );

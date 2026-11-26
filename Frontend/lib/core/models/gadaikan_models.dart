@@ -274,6 +274,25 @@ class PawnDocument {
   }
 }
 
+/// Halaman daftar pengajuan (bisa dari API atau mock berlabel).
+class PagedApplications {
+  const PagedApplications({
+    required this.items,
+    required this.page,
+    required this.perPage,
+    required this.total,
+    this.isDemo = false,
+  });
+
+  final List<PawnApplication> items;
+  final int page;
+  final int perPage;
+  final int total;
+  final bool isDemo;
+
+  bool get hasMore => page * perPage < total;
+}
+
 class PawnAssessment {
   const PawnAssessment({
     required this.assessedValue,
@@ -342,6 +361,94 @@ class PawnApplication {
   final int? preferredTenorDays;
   final String? adminNote;
   final PawnAssessment? assessment;
+
+  factory PawnApplication.fromApiJson(Map<String, dynamic> json) {
+    final Object? rawDetails = json['item_details'] ?? json['details'];
+    final Map<String, String> details = <String, String>{};
+    if (rawDetails is Map) {
+      rawDetails.forEach((Object? key, Object? value) {
+        details['$key'] = '$value';
+      });
+    }
+
+    final Object? rawDocs = json['documents'];
+    final List<PawnDocument> documents = <PawnDocument>[];
+    if (rawDocs is List) {
+      for (final Object? item in rawDocs) {
+        if (item is! Map) continue;
+        final Map<String, dynamic> doc = Map<String, dynamic>.from(item);
+        documents.add(
+          PawnDocument(
+            id: '${doc['id'] ?? doc['document_id'] ?? ''}',
+            label: '${doc['label'] ?? doc['type'] ?? 'Berkas'}',
+            fileName: '${doc['file_name'] ?? doc['name'] ?? 'berkas'}',
+            sizeLabel: '${doc['size_label'] ?? doc['size'] ?? ''}',
+            isSensitive: doc['is_sensitive'] == true,
+            serverId: doc['id']?.toString(),
+          ),
+        );
+      }
+    }
+
+    final Object? rawHistory = json['status_history'];
+    final List<ApplicationStatusHistory> history = <ApplicationStatusHistory>[];
+    if (rawHistory is List) {
+      for (final Object? item in rawHistory) {
+        if (item is! Map) continue;
+        final Map<String, dynamic> entry = Map<String, dynamic>.from(item);
+        history.add(
+          ApplicationStatusHistory(
+            status: _statusFromApi('${entry['status'] ?? 'submitted'}'),
+            title: '${entry['title'] ?? entry['status'] ?? 'Diperbarui'}',
+            note: '${entry['note'] ?? ''}',
+            timestamp: DateTime.tryParse('${entry['timestamp'] ?? ''}') ??
+                DateTime.now(),
+          ),
+        );
+      }
+    }
+
+    final DateTime now = DateTime.now();
+    return PawnApplication(
+      id: '${json['id'] ?? json['application_id'] ?? ''}',
+      code: '${json['code'] ?? json['number'] ?? ''}',
+      category: PawnCategory.fromId(
+            '${json['category'] ?? json['category_id'] ?? ''}',
+          ) ??
+          PawnCategory.elektronik,
+      itemTitle: '${json['item_title'] ?? json['title'] ?? ''}',
+      itemDetails: details,
+      documents: documents,
+      status: _statusFromApi('${json['status'] ?? 'submitted'}'),
+      statusHistory: history,
+      createdAt: DateTime.tryParse('${json['created_at'] ?? ''}') ?? now,
+      updatedAt: DateTime.tryParse('${json['updated_at'] ?? ''}') ?? now,
+      estimatedUserValue: (json['estimated_value'] is num)
+          ? (json['estimated_value'] as num).toDouble()
+          : null,
+      preferredTenorDays: json['preferred_tenor_days'] is num
+          ? (json['preferred_tenor_days'] as num).toInt()
+          : null,
+    );
+  }
+
+  static ApplicationStatus _statusFromApi(String raw) {
+    final String normalized = raw
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_')
+        .toLowerCase();
+    for (final ApplicationStatus status in ApplicationStatus.values) {
+      if (_toSnake(status.name) == normalized || status.name == normalized) {
+        return status;
+      }
+    }
+    return ApplicationStatus.submitted;
+  }
+
+  static String _toSnake(String value) {
+    final RegExp regex = RegExp(r'(?<!^)(?=[A-Z])');
+    return value.replaceAllMapped(regex, (Match m) => '_').toLowerCase();
+  }
 
   PawnApplication copyWith({
     String? itemTitle,

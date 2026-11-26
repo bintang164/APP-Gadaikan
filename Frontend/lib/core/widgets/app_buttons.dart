@@ -77,6 +77,7 @@ class SecondaryButton extends StatelessWidget {
     this.icon,
     this.foregroundColor,
     this.borderColor,
+    this.isLoading = false,
   });
 
   final String label;
@@ -84,6 +85,7 @@ class SecondaryButton extends StatelessWidget {
   final IconData? icon;
   final Color? foregroundColor;
   final Color? borderColor;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +94,7 @@ class SecondaryButton extends StatelessWidget {
       width: double.infinity,
       height: AppSpacing.buttonHeight,
       child: OutlinedButton(
-        onPressed: onPressed,
+        onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: fg,
           side: BorderSide(color: borderColor ?? fg, width: 1.2),
@@ -100,7 +102,13 @@ class SecondaryButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
           ),
         ),
-        child: Row(
+        child: isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
+              )
+            : Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [

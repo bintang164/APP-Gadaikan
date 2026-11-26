@@ -23,6 +23,9 @@ class AuthRepository {
 
   bool get isMock => service.isMock;
 
+  /// Token akses untuk request API terotorisasi.
+  Future<String?> readToken() => sessionStore.readToken();
+
   /// Memulihkan sesi dari penyimpanan.
   ///
   /// - Tidak ada token -> `null`.

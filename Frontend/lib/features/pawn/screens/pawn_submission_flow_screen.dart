@@ -22,12 +22,14 @@ class PawnSubmissionFlowScreen extends StatefulWidget {
     required this.initialCategory,
     this.initialEstimatedValue,
     this.initialTenorDays,
+    this.initialSimulationResult,
     this.existingApplication,
   });
 
   final PawnCategory initialCategory;
   final double? initialEstimatedValue;
   final int? initialTenorDays;
+  final SimulationResult? initialSimulationResult;
   final PawnApplication? existingApplication;
 
   @override
@@ -46,6 +48,8 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
   bool _truthConfirmed = false;
   bool _showTruthError = false;
   bool _showUploadValidation = false;
+  String? _submitError;
+  SimulationResult? _simulationResult;
 
   // Shared controllers
   final _estimatedValueCtrl = TextEditingController();
@@ -117,6 +121,7 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
   void initState() {
     super.initState();
     _category = widget.existingApplication?.category ?? widget.initialCategory;
+    _simulationResult = widget.initialSimulationResult;
 
     if (widget.initialEstimatedValue != null) {
       _estimatedValueCtrl.text =
@@ -410,6 +415,10 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
     return details;
   }
 
+  bool get _reviewDataValid => _docSlots
+      .where((slot) => slot.required)
+      .every((slot) => _isDocumentReady(_uploadedDocs[slot.title]));
+
   bool get _isCurrentStepValid {
     switch (_stepIndex) {
       case 0:
@@ -443,13 +452,18 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
               _accessories.isNotEmpty &&
               _notesCtrl.text.trim().isNotEmpty;
         }
-        return true;
-      case 2:
         return _docSlots
             .where((slot) => slot.required)
             .every((slot) => _isDocumentReady(_uploadedDocs[slot.title]));
+      case 2:
+        if (_category == PawnCategory.elektronik) {
+          return _docSlots
+              .where((slot) => slot.required)
+              .every((slot) => _isDocumentReady(_uploadedDocs[slot.title]));
+        }
+        return _truthConfirmed && _reviewDataValid;
       default:
-        return true;
+        return _truthConfirmed && _reviewDataValid;
     }
   }
 
@@ -653,13 +667,15 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
   }
 
   Future<void> _submitFinal() async {
-    if (!_truthConfirmed) {
-      setState(() => _showTruthError = true);
+    if (_isSubmitting) return; // cegah double submit
+    if (!_truthConfirmed || !_reviewDataValid) {
+      setState(() => _showTruthError = !_truthConfirmed);
       return;
     }
 
     setState(() {
       _showTruthError = false;
+      _submitError = null;
       _isSubmitting = true;
     });
 
@@ -698,11 +714,10 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
       setState(() => _submittedApp = result);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-        ),
-      );
+      // Data form tetap dipertahankan; nomor pengajuan tidak dibuat palsu.
+      setState(() {
+        _submitError = e.toString().replaceFirst('Exception: ', '');
+      });
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -1426,6 +1441,36 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
           style: AppTextStyles.sectionHeading,
         ),
         const SizedBox(height: AppSpacing.md),
+        _buildUserDataCard(),
+        const SizedBox(height: AppSpacing.md),
+        if (_simulationResult != null) ...[
+          _buildSimulationSummaryCard(_simulationResult!),
+          const SizedBox(height: AppSpacing.md),
+        ],
+        if (_submitError != null) ...[
+          AppCard(
+            backgroundColor: AppColors.dangerSoft,
+            borderColor: AppColors.danger.withValues(alpha: 0.3),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.error_outline_rounded,
+                    size: 18, color: AppColors.danger),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Pengajuan belum berhasil dikirim: $_submitError\n'
+                    'Data kamu tetap tersimpan. Periksa koneksi lalu coba lagi.',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1555,6 +1600,69 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
     );
   }
 
+  Widget _buildUserDataCard() {
+    final UserProfile? user = AppStateScope.maybeOf(context)?.user;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Data Pemohon', style: AppTextStyles.cardTitle),
+          const SizedBox(height: 8),
+          _ReviewRow(label: 'Nama', value: user?.name ?? '-'),
+          const SizedBox(height: 6),
+          _ReviewRow(label: 'Nomor HP', value: user?.phone ?? '-'),
+          if (user?.email != null && user!.email!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _ReviewRow(label: 'Email', value: user.email!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimulationSummaryCard(SimulationResult result) {
+    return AppCard(
+      backgroundColor: AppColors.primarySoft,
+      borderColor: AppColors.primary.withValues(alpha: 0.2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.calculate_outlined,
+                  size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text('Estimasi Simulasi', style: AppTextStyles.cardTitle),
+              const SizedBox(width: 8),
+              const _DemoPill(label: 'Simulasi'),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _ReviewRow(
+            label: 'Estimasi Plafon',
+            value: AppFormatters.formatRupiah(result.estimatedPrincipal),
+          ),
+          const SizedBox(height: 6),
+          _ReviewRow(
+            label: 'Estimasi Biaya',
+            value: AppFormatters.formatRupiah(result.estimatedFee),
+          ),
+          const SizedBox(height: 6),
+          _ReviewRow(
+            label: 'Estimasi Total',
+            value: AppFormatters.formatRupiah(result.estimatedTotal),
+            highlight: true,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Hasil simulasi, bukan penawaran final.',
+            style: AppTextStyles.caption,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBottomBar() {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
@@ -1575,6 +1683,16 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
             ),
             const SizedBox(width: AppSpacing.md),
           ],
+          if (_stepIndex == _reviewStep) ...[
+            Expanded(
+              child: SecondaryButton(
+                label: 'Ubah Data',
+                icon: Icons.edit_outlined,
+                onPressed: _isSubmitting ? null : () => setState(() => _stepIndex = 0),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+          ],
           Expanded(
             flex: 2,
             child: PrimaryButton(
@@ -1588,6 +1706,63 @@ class _PawnSubmissionFlowScreenState extends State<PawnSubmissionFlowScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ReviewRow extends StatelessWidget {
+  const _ReviewRow({
+    required this.label,
+    required this.value,
+    this.highlight = false,
+  });
+
+  final String label;
+  final String value;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: Text(label, style: AppTextStyles.caption)),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: highlight
+                ? AppTextStyles.bodyMedium.copyWith(color: AppColors.primary)
+                : AppTextStyles.bodyMedium,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DemoPill extends StatelessWidget {
+  const _DemoPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.accentGoldSoft,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.caption.copyWith(
+          color: AppColors.warning,
+          fontSize: 11,
+        ),
       ),
     );
   }
@@ -1825,8 +2000,12 @@ class _SuccessSubmittedView extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.sm),
-              const Text(
-                'Pengajuan Anda telah masuk ke antrean verifikasi. Pantau perkembangan status secara berkala.',
+              Text(
+                AppConfig.useMockAuth
+                    ? 'Mode demo: pengajuan tersimpan lokal pada perangkat. '
+                        'Belum ada data yang dikirim ke server Laravel.'
+                    : 'Pengajuan berhasil dikirim ke server. Pantau perkembangan '
+                        'status secara berkala.',
                 style: AppTextStyles.bodySecondary,
                 textAlign: TextAlign.center,
               ),
@@ -1852,6 +2031,14 @@ class _SuccessSubmittedView extends StatelessWidget {
                       application.itemTitle,
                       style: AppTextStyles.bodyMedium,
                     ),
+                    if (AppConfig.useMockAuth) ...[
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Nomor demo dibuat lokal, bukan dari server.',
+                        style: AppTextStyles.caption,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ],
                 ),
               ),
