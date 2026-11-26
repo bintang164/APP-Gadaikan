@@ -28,6 +28,7 @@ class AppTextField extends StatelessWidget {
   final FocusNode? focusNode;
   final ValueChanged<String>? onFieldSubmitted;
   final EdgeInsetsGeometry? contentPadding;
+  final AutovalidateMode autovalidateMode;
 
   const AppTextField({
     super.key,
@@ -53,6 +54,7 @@ class AppTextField extends StatelessWidget {
     this.focusNode,
     this.onFieldSubmitted,
     this.contentPadding,
+    this.autovalidateMode = AutovalidateMode.disabled,
   });
 
   @override
@@ -73,6 +75,7 @@ class AppTextField extends StatelessWidget {
       autofillHints: autofillHints,
       focusNode: focusNode,
       onFieldSubmitted: onFieldSubmitted,
+      autovalidateMode: autovalidateMode,
       style: AppTextStyles.bodyLarge,
       decoration: InputDecoration(
         labelText: label,

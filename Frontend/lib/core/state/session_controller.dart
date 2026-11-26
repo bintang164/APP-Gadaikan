@@ -1,43 +1,45 @@
 import 'package:flutter/foundation.dart';
 
+import '../auth/auth_repository.dart';
+import '../config/app_config.dart';
+import '../models/auth_user.dart';
 import '../storage/local_storage.dart';
-import '../storage/session_store.dart';
 
-/// Status sesi aplikasi.
+/// Status sesi aplikasi (Riverpod `ChangeNotifier`).
 ///
-/// Tahap 2 memakai sesi demo lokal yang jelas dilabeli di UI. Tahap
-/// berikutnya akan mengganti [loginDemo] dengan autentikasi Laravel
-/// Sanctum tanpa mengubah kontrak layar.
+/// Persistensi mekanisme token: token disimpan aman di `SessionStore`,
+/// profil non-sensitif di `LocalStorage`. Kata sandi tidak disimpan.
 class SessionController extends ChangeNotifier {
   final LocalStorage localStorage;
-  final SessionStore sessionStore;
+  final AuthRepository authRepository;
 
   bool _initialized = false;
-  bool _isAuthenticated = false;
   bool _onboardingCompleted = false;
   bool _isBusy = false;
-  String? _userName;
-  String? _userPhone;
+  AuthUser? _user;
 
   SessionController({
     required this.localStorage,
-    required this.sessionStore,
+    required this.authRepository,
   });
 
   bool get initialized => _initialized;
-  bool get isAuthenticated => _isAuthenticated;
   bool get onboardingCompleted => _onboardingCompleted;
   bool get isBusy => _isBusy;
-  String? get userName => _userName;
-  String? get userPhone => _userPhone;
+  bool get isAuthenticated => _user != null;
+  AuthUser? get user => _user;
 
-  String get displayName {
-    final String? name = _userName?.trim();
-    if (name != null && name.isNotEmpty) return name;
-    return 'Pengguna Gadaikan';
-  }
+  /// Nama pengguna dari profil/API; fallback aman bila kosong.
+  String get displayName => _user?.safeName ?? 'Pengguna Gadaikan';
+  String? get userName => _user?.name;
+  String? get userPhone => _user?.phone;
+  String? get userEmail => _user?.email;
+  String get userInitials => _user?.initials ?? 'G';
 
-  /// Membaca flag onboarding dan token sesi.
+  /// True jika sesi berasal dari mode demo lokal, bukan backend Laravel.
+  bool get isDemoMode => _user?.isDemo ?? AppConfig.useMockAuth;
+
+  /// Membaca flag onboarding dan memulihkan sesi token.
   ///
   /// Error storage tidak boleh membuat aplikasi crash; fallback ke
   /// kondisi belum login.
@@ -46,14 +48,11 @@ class SessionController extends ChangeNotifier {
 
     try {
       _onboardingCompleted = await localStorage.isOnboardingCompleted();
-      final String? token = await sessionStore.readToken();
-      _isAuthenticated = token != null && token.isNotEmpty;
-      _userName = await localStorage.getUserName();
-      _userPhone = await localStorage.getUserPhone();
+      _user = await authRepository.restoreSession();
     } catch (error, stackTrace) {
       debugPrint('Session bootstrap gagal: $error');
       debugPrintStack(stackTrace: stackTrace);
-      _isAuthenticated = false;
+      _user = null;
       _onboardingCompleted = false;
     } finally {
       _initialized = true;
@@ -68,10 +67,32 @@ class SessionController extends ChangeNotifier {
     await localStorage.setOnboardingCompleted(true);
   }
 
+  /// Login dengan mencegah double submit via [isBusy].
+  Future<void> login({
+    required String identifier,
+    required String password,
+  }) async {
+    if (_isBusy) return;
+    _isBusy = true;
+    notifyListeners();
+    try {
+      _user = await authRepository.login(
+        identifier: identifier,
+        password: password,
+      );
+    } finally {
+      _isBusy = false;
+      notifyListeners();
+    }
+  }
+
+  /// Login demo untuk mode offline/Tahap 2. Melabeli hasil sebagai
+  /// mode demo di UI.
   Future<void> loginDemo({
     required String identifier,
     String? name,
   }) async {
+    if (_isBusy) return;
     _isBusy = true;
     notifyListeners();
     try {
@@ -80,37 +101,33 @@ class SessionController extends ChangeNotifier {
           ? name.trim()
           : _nameFromIdentifier(trimmed);
 
-      await sessionStore.writeToken(
-        'demo-${DateTime.now().microsecondsSinceEpoch}',
+      final AuthUser loggedIn = await authRepository.login(
+        identifier: trimmed,
+        password: 'demo123', // password dummy di mode demo
       );
-      await localStorage.setUserName(resolvedName);
-      await localStorage.setUserPhone(trimmed);
-
-      _userName = resolvedName;
-      _userPhone = trimmed;
-      _isAuthenticated = true;
+      _user = loggedIn.copyWith(isDemo: true, name: resolvedName);
     } finally {
       _isBusy = false;
       notifyListeners();
     }
   }
 
+  /// Registrasi demo untuk mode offline/Tahap 2.
   Future<void> registerDemo({
     required String name,
     required String phone,
   }) async {
+    if (_isBusy) return;
     _isBusy = true;
     notifyListeners();
     try {
-      await sessionStore.writeToken(
-        'demo-${DateTime.now().microsecondsSinceEpoch}',
+      final AuthUser registered = await authRepository.register(
+        name: name.trim(),
+        phone: phone.trim(),
+        email: null,
+        password: 'demo123', // password dummy di mode demo
       );
-      await localStorage.setUserName(name.trim());
-      await localStorage.setUserPhone(phone.trim());
-
-      _userName = name.trim();
-      _userPhone = phone.trim();
-      _isAuthenticated = true;
+      _user = registered.copyWith(isDemo: true);
     } finally {
       _isBusy = false;
       notifyListeners();
@@ -118,12 +135,15 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await sessionStore.clear();
-    await localStorage.clearUserProfile();
-    _isAuthenticated = false;
-    _userName = null;
-    _userPhone = null;
+    _isBusy = true;
     notifyListeners();
+    try {
+      await authRepository.logout();
+    } finally {
+      _user = null;
+      _isBusy = false;
+      notifyListeners();
+    }
   }
 
   String _nameFromIdentifier(String identifier) {

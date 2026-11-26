@@ -1,33 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import '../../../core/auth/auth_exception.dart';
+import '../../../core/state/app_state.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/app_buttons.dart';
+import '../../../core/widgets/app_cards.dart';
+import '../../../core/widgets/app_text_fields.dart';
+import '../../../core/widgets/gadaikan_logo.dart';
+import '../../home/screens/main_shell_screen.dart';
+import 'register_screen.dart';
 
-import '../../../app/routes/app_routes.dart';
-import '../../../app/theme/app_colors.dart';
-import '../../../app/theme/app_spacing.dart';
-import '../../../app/theme/app_text_styles.dart';
-import '../../../app/widgets/app_logo.dart';
-import '../../../app/widgets/app_text_field.dart';
-import '../../../app/widgets/password_field.dart';
-import '../../../app/widgets/primary_button.dart';
-import '../../../app/widgets/secondary_button.dart';
-import '../../../core/providers/session_providers.dart';
-import '../../../core/utils/validators.dart';
-
-class LoginScreen extends ConsumerStatefulWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
+  static const String routeName = '/login';
+
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _identifierController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-
-  bool _isLoading = false;
-  String? _errorText;
+class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _identifierController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isSubmitting = false;
+  String? _formError;
+  final Map<String, String> _fieldErrors = <String, String>{};
 
   @override
   void dispose() {
@@ -37,221 +37,228 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (_isLoading) return;
+    if (_isSubmitting) return; // cegah double submit
+    setState(() {
+      _formError = null;
+      _fieldErrors.clear();
+    });
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _isLoading = true;
-      _errorText = null;
-    });
-
+    setState(() => _isSubmitting = true);
     try {
-      await ref.read(sessionControllerProvider).loginDemo(
-            identifier: _identifierController.text,
-          );
+      await AppStateScope.of(context).login(
+        identifier: _identifierController.text.trim(),
+        password: _passwordController.text,
+      );
       if (!mounted) return;
-      context.go(AppRoutes.home);
-    } catch (_) {
+      Navigator.of(context).pushReplacementNamed(MainShellScreen.routeName);
+    } on AuthException catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorText = 'Gagal masuk. Silakan coba lagi.';
+        _formError = e.message;
+        _fieldErrors.addAll(e.fieldErrors);
+      });
+      _formKey.currentState?.validate();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _formError = e.toString().replaceFirst('Exception: ', '');
       });
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => _isSubmitting = false);
       }
     }
   }
 
-  Future<void> _showForgotPassword() async {
-    await showDialog<void>(
+  String? _identifierValidator(String? value) {
+    final String? serverError = _fieldErrors['identifier'] ??
+        _fieldErrors['email'] ??
+        _fieldErrors['login'];
+    if (serverError != null) return serverError;
+    return AppValidators.phoneOrEmail(value);
+  }
+
+  String? _passwordValidator(String? value) {
+    final String? serverError = _fieldErrors['password'];
+    if (serverError != null) return serverError;
+    return AppValidators.password(value);
+  }
+
+  void _fillDemoCredentials() {
+    _identifierController.text = '081234567890';
+    _passwordController.text = 'demo1234';
+    setState(() => _formError = null);
+  }
+
+  void _showForgotPasswordDialog() {
+    showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Lupa kata sandi?'),
-          content: const Text(
-            'Pemulihan kata sandi akan tersedia setelah backend Gadaikan '
-            'terhubung. Untuk prototipe ini, gunakan kata sandi apa pun '
-            'minimal 8 karakter.',
+      builder: (ctx) => AlertDialog(
+        title: const Text('Lupa kata sandi'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Pemulihan kata sandi belum tersedia karena backend Laravel '
+            'belum terhubung. Aplikasi tidak mengirim email/SMS apa pun.\n\n'
+            'Pada mode demo, gunakan akun demo 081234567890 dengan kata '
+            'sandi minimal 8 karakter, atau daftar akun demo baru.',
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Mengerti'),
-            ),
-          ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Mengerti'),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final double bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-
     return Scaffold(
-      key: const Key('login_screen'),
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.horizontal,
-              AppSpacing.xl,
-              AppSpacing.horizontal,
-              AppSpacing.xl + bottomInset,
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Center(
-                      child: AppLogo(
-                        fontSize: 30,
-                        showTagline: true,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xxl),
-                    Text(
-                      'Selamat datang kembali',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.headlineLarge,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Masuk untuk melanjutkan pengajuan gadai.',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    AppTextField(
-                      controller: _identifierController,
-                      label: 'Nomor HP atau email',
-                      hint: 'Contoh: 081234567890',
-                      prefixIcon: Icons.person_outline_rounded,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.username],
-                      validator: Validators.emailOrPhone,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    PasswordField(
-                      controller: _passwordController,
-                      label: 'Kata sandi',
-                      hint: 'Minimal 8 karakter',
-                      validator: Validators.password,
-                      autofillHints: const [AutofillHints.password],
-                      onFieldSubmitted: (_) => _submit(),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _isLoading ? null : _showForgotPassword,
-                        child: const Text('Lupa kata sandi?'),
-                      ),
-                    ),
-                    if (_errorText != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.sm),
-                        decoration: BoxDecoration(
-                          color: AppColors.dangerSoft,
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
-                          border: Border.all(
-                            color: AppColors.danger.withValues(alpha: 0.25),
-                          ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontal,
+            vertical: AppSpacing.lg,
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const GadaikanLogo(size: 46),
+                const SizedBox(height: AppSpacing.xl),
+                const Text(
+                  'Selamat datang kembali',
+                  style: AppTextStyles.pageHeading,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                const Text(
+                  'Masuk untuk mengelola pengajuan dan memantau transaksi gadai Anda.',
+                  style: AppTextStyles.bodySecondary,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                if (_formError != null) ...[
+                  AppCard(
+                    backgroundColor: AppColors.dangerSoft,
+                    borderColor: AppColors.danger.withValues(alpha: 0.35),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: AppColors.danger,
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.error_outline_rounded,
-                              size: 18,
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            _formError!,
+                            style: AppTextStyles.body.copyWith(
                               color: AppColors.danger,
                             ),
-                            const SizedBox(width: AppSpacing.xs),
-                            Expanded(
-                              child: Text(
-                                _errorText!,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.danger,
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                    PrimaryButton(
-                      label: 'Masuk',
-                      onPressed: _isLoading ? null : _submit,
-                      isLoading: _isLoading,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: AppColors.infoSoft,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.info_outline_rounded,
-                            size: 18,
-                            color: AppColors.info,
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Expanded(
-                            child: Text(
-                              'Mode demo: autentikasi backend belum aktif. '
-                              'Data yang dimasukkan hanya disimpan di perangkat.',
-                              style: AppTextStyles.caption.copyWith(
-                                color: AppColors.info,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    Row(
-                      children: const [
-                        Expanded(child: Divider()),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                          ),
-                          child: Text('atau'),
-                        ),
-                        Expanded(child: Divider()),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    SecondaryButton(
-                      label: 'Daftar akun',
-                      onPressed: _isLoading
-                          ? null
-                          : () => context.go(AppRoutes.register),
-                      isFullWidth: true,
-                      icon: Icons.person_add_alt_1_outlined,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                AppTextField(
+                  label: 'Nomor HP atau Email',
+                  controller: _identifierController,
+                  hint: 'Contoh: 081234567890 atau budi@email.com',
+                  prefixIcon: Icons.person_outline_rounded,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  validator: _identifierValidator,
+                  onChanged: (_) {
+                    if (_fieldErrors.isNotEmpty) {
+                      setState(() => _fieldErrors.clear());
+                    }
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                PasswordField(
+                  label: 'Kata Sandi',
+                  controller: _passwordController,
+                  validator: _passwordValidator,
+                  textInputAction: TextInputAction.done,
+                  onChanged: (_) {
+                    if (_fieldErrors.isNotEmpty) {
+                      setState(() => _fieldErrors.clear());
+                    }
+                  },
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _showForgotPasswordDialog,
+                    child: Text(
+                      'Lupa kata sandi?',
+                      style: AppTextStyles.captionBold.copyWith(
+                        color: AppColors.primary,
+                      ),
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      'Dengan masuk, kamu menyetujui syarat layanan dan '
-                      'kebijakan privasi Gadaikan.',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.caption,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                PrimaryButton(
+                  label: 'Masuk',
+                  isLoading: _isSubmitting,
+                  onPressed: _submit,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppCard(
+                  backgroundColor: AppColors.primarySoft,
+                  borderColor: AppColors.primary.withValues(alpha: 0.2),
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Mode Demo: gunakan akun simulasi untuk mencoba seluruh alur.',
+                          style: AppTextStyles.caption,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _fillDemoCredentials,
+                        child: const Text('Isi Demo'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Belum punya akun? ',
+                      style: AppTextStyles.bodySecondary,
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pushNamed(
+                          RegisterScreen.routeName,
+                        );
+                      },
+                      child: Text(
+                        'Daftar Akun',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.primary,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
         ),

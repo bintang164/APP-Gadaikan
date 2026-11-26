@@ -1,0 +1,443 @@
+import 'package:flutter/material.dart';
+import '../widgets/status_badge.dart';
+
+enum PawnCategory {
+  elektronik,
+  emas,
+  bpkb;
+
+  String get label => switch (this) {
+        PawnCategory.elektronik => 'Elektronik',
+        PawnCategory.emas => 'Emas',
+        PawnCategory.bpkb => 'BPKB Kendaraan',
+      };
+
+  String get shortSubtitle => switch (this) {
+        PawnCategory.elektronik => 'Smartphone, laptop, kamera, dan gadget',
+        PawnCategory.emas => 'Perhiasan emas atau logam mulia',
+        PawnCategory.bpkb => 'BPKB motor atau mobil atas nama pribadi',
+      };
+
+  IconData get icon => switch (this) {
+        PawnCategory.elektronik => Icons.devices_rounded,
+        PawnCategory.emas => Icons.diamond_outlined,
+        PawnCategory.bpkb => Icons.directions_car_outlined,
+      };
+}
+
+enum ApplicationStatus {
+  draft,
+  submitted,
+  underReview,
+  revisionRequired,
+  approved,
+  rejected,
+  offerAccepted,
+  offerDeclined,
+  cancelled;
+
+  String get label => switch (this) {
+        ApplicationStatus.draft => 'Draf',
+        ApplicationStatus.submitted => 'Dikirim',
+        ApplicationStatus.underReview => 'Sedang Ditinjau',
+        ApplicationStatus.revisionRequired => 'Perlu Perbaikan',
+        ApplicationStatus.approved => 'Disetujui',
+        ApplicationStatus.rejected => 'Ditolak',
+        ApplicationStatus.offerAccepted => 'Penawaran Diterima',
+        ApplicationStatus.offerDeclined => 'Penawaran Ditolak',
+        ApplicationStatus.cancelled => 'Dibatalkan',
+      };
+
+  StatusTone get tone => switch (this) {
+        ApplicationStatus.draft => StatusTone.neutral,
+        ApplicationStatus.submitted => StatusTone.info,
+        ApplicationStatus.underReview => StatusTone.warning,
+        ApplicationStatus.revisionRequired => StatusTone.warning,
+        ApplicationStatus.approved => StatusTone.success,
+        ApplicationStatus.rejected => StatusTone.danger,
+        ApplicationStatus.offerAccepted => StatusTone.success,
+        ApplicationStatus.offerDeclined => StatusTone.neutral,
+        ApplicationStatus.cancelled => StatusTone.neutral,
+      };
+
+  bool get isPendingAction =>
+      this == ApplicationStatus.submitted ||
+      this == ApplicationStatus.underReview ||
+      this == ApplicationStatus.revisionRequired ||
+      this == ApplicationStatus.approved;
+}
+
+enum TransactionStatus {
+  active,
+  paymentPending,
+  paidOff,
+  overdue,
+  closed;
+
+  String get label => switch (this) {
+        TransactionStatus.active => 'Aktif',
+        TransactionStatus.paymentPending => 'Menunggu Konfirmasi',
+        TransactionStatus.paidOff => 'Lunas',
+        TransactionStatus.overdue => 'Jatuh Tempo',
+        TransactionStatus.closed => 'Ditutup',
+      };
+
+  StatusTone get tone => switch (this) {
+        TransactionStatus.active => StatusTone.info,
+        TransactionStatus.paymentPending => StatusTone.warning,
+        TransactionStatus.paidOff => StatusTone.success,
+        TransactionStatus.overdue => StatusTone.danger,
+        TransactionStatus.closed => StatusTone.neutral,
+      };
+}
+
+class UserProfile {
+  const UserProfile({
+    required this.id,
+    required this.name,
+    required this.phone,
+    this.email,
+    this.address,
+  });
+
+  final String id;
+  final String name;
+  final String phone;
+  final String? email;
+  final String? address;
+
+  UserProfile copyWith({
+    String? name,
+    String? phone,
+    String? email,
+    String? address,
+  }) {
+    return UserProfile(
+      id: id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      address: address ?? this.address,
+    );
+  }
+}
+
+class PawnDocument {
+  const PawnDocument({
+    required this.id,
+    required this.label,
+    required this.fileName,
+    required this.sizeLabel,
+    this.isSensitive = false,
+  });
+
+  final String id;
+  final String label;
+  final String fileName;
+  final String sizeLabel;
+  final bool isSensitive;
+}
+
+class PawnAssessment {
+  const PawnAssessment({
+    required this.assessedValue,
+    required this.approvedPrincipal,
+    required this.serviceFee,
+    required this.tenorDays,
+    required this.startDate,
+    required this.dueDate,
+    this.notes,
+  });
+
+  final double assessedValue;
+  final double approvedPrincipal;
+  final double serviceFee;
+  final int tenorDays;
+  final DateTime startDate;
+  final DateTime dueDate;
+  final String? notes;
+
+  double get totalRepayment => approvedPrincipal + serviceFee;
+}
+
+class ApplicationStatusHistory {
+  const ApplicationStatusHistory({
+    required this.status,
+    required this.title,
+    required this.note,
+    required this.timestamp,
+  });
+
+  final ApplicationStatus status;
+  final String title;
+  final String note;
+  final DateTime timestamp;
+}
+
+class PawnApplication {
+  const PawnApplication({
+    required this.id,
+    required this.code,
+    required this.category,
+    required this.itemTitle,
+    required this.itemDetails,
+    required this.documents,
+    required this.status,
+    required this.statusHistory,
+    required this.createdAt,
+    required this.updatedAt,
+    this.estimatedUserValue,
+    this.preferredTenorDays,
+    this.adminNote,
+    this.assessment,
+  });
+
+  final String id;
+  final String code;
+  final PawnCategory category;
+  final String itemTitle;
+  final Map<String, String> itemDetails;
+  final List<PawnDocument> documents;
+  final ApplicationStatus status;
+  final List<ApplicationStatusHistory> statusHistory;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final double? estimatedUserValue;
+  final int? preferredTenorDays;
+  final String? adminNote;
+  final PawnAssessment? assessment;
+
+  PawnApplication copyWith({
+    String? itemTitle,
+    Map<String, String>? itemDetails,
+    List<PawnDocument>? documents,
+    ApplicationStatus? status,
+    List<ApplicationStatusHistory>? statusHistory,
+    DateTime? updatedAt,
+    double? estimatedUserValue,
+    int? preferredTenorDays,
+    String? adminNote,
+    PawnAssessment? assessment,
+  }) {
+    return PawnApplication(
+      id: id,
+      code: code,
+      category: category,
+      itemTitle: itemTitle ?? this.itemTitle,
+      itemDetails: itemDetails ?? this.itemDetails,
+      documents: documents ?? this.documents,
+      status: status ?? this.status,
+      statusHistory: statusHistory ?? this.statusHistory,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      estimatedUserValue: estimatedUserValue ?? this.estimatedUserValue,
+      preferredTenorDays: preferredTenorDays ?? this.preferredTenorDays,
+      adminNote: adminNote ?? this.adminNote,
+      assessment: assessment ?? this.assessment,
+    );
+  }
+}
+
+class DemoPayment {
+  const DemoPayment({
+    required this.id,
+    required this.amount,
+    required this.method,
+    required this.paidAt,
+    this.note,
+  });
+
+  final String id;
+  final double amount;
+  final String method;
+  final DateTime paidAt;
+  final String? note;
+}
+
+class PawnTransaction {
+  const PawnTransaction({
+    required this.id,
+    required this.code,
+    required this.applicationId,
+    required this.itemTitle,
+    required this.category,
+    required this.principalAmount,
+    required this.feeAmount,
+    required this.paidAmount,
+    required this.tenorDays,
+    required this.startDate,
+    required this.dueDate,
+    required this.status,
+    required this.payments,
+  });
+
+  final String id;
+  final String code;
+  final String applicationId;
+  final String itemTitle;
+  final PawnCategory category;
+  final double principalAmount;
+  final double feeAmount;
+  final double paidAmount;
+  final int tenorDays;
+  final DateTime startDate;
+  final DateTime dueDate;
+  final TransactionStatus status;
+  final List<DemoPayment> payments;
+
+  double get totalDue => principalAmount + feeAmount;
+  double get remainingAmount =>
+      (totalDue - paidAmount).clamp(0, double.infinity).toDouble();
+
+  PawnTransaction copyWith({
+    double? paidAmount,
+    TransactionStatus? status,
+    List<DemoPayment>? payments,
+  }) {
+    return PawnTransaction(
+      id: id,
+      code: code,
+      applicationId: applicationId,
+      itemTitle: itemTitle,
+      category: category,
+      principalAmount: principalAmount,
+      feeAmount: feeAmount,
+      paidAmount: paidAmount ?? this.paidAmount,
+      tenorDays: tenorDays,
+      startDate: startDate,
+      dueDate: dueDate,
+      status: status ?? this.status,
+      payments: payments ?? this.payments,
+    );
+  }
+}
+
+class SimulationConfig {
+  const SimulationConfig({
+    required this.plafonPercentageByCategory,
+    required this.feeRatePerPeriod,
+    required this.periodDays,
+    required this.allowedTenorDays,
+    required this.minEstimatedValue,
+    required this.maxEstimatedValue,
+    required this.disclaimer,
+  });
+
+  final Map<PawnCategory, double> plafonPercentageByCategory;
+  final double feeRatePerPeriod;
+  final int periodDays;
+  final List<int> allowedTenorDays;
+  final double minEstimatedValue;
+  final double maxEstimatedValue;
+  final String disclaimer;
+
+  SimulationResult calculate({
+    required PawnCategory category,
+    required double estimatedValue,
+    required int tenorDays,
+  }) {
+    final pct = plafonPercentageByCategory[category] ?? 0.75;
+    final principal = estimatedValue * pct;
+    final periods = tenorDays / periodDays;
+    final fee = principal * feeRatePerPeriod * periods;
+    final total = principal + fee;
+    return SimulationResult(
+      estimatedPrincipal: principal,
+      estimatedFee: fee,
+      estimatedTotal: total,
+      plafonPercentage: pct,
+    );
+  }
+}
+
+class SimulationResult {
+  const SimulationResult({
+    required this.estimatedPrincipal,
+    required this.estimatedFee,
+    required this.estimatedTotal,
+    required this.plafonPercentage,
+  });
+
+  final double estimatedPrincipal;
+  final double estimatedFee;
+  final double estimatedTotal;
+  final double plafonPercentage;
+}
+
+class OutletInfo {
+  const OutletInfo({
+    required this.id,
+    required this.name,
+    required this.address,
+    required this.city,
+    required this.hours,
+    required this.phone,
+  });
+
+  final String id;
+  final String name;
+  final String address;
+  final String city;
+  final String hours;
+  final String phone;
+}
+
+class PromoInfo {
+  const PromoInfo({
+    required this.id,
+    required this.title,
+    required this.period,
+    required this.summary,
+    required this.terms,
+    this.badgeText = 'Simulasi Demo',
+  });
+
+  final String id;
+  final String title;
+  final String period;
+  final String summary;
+  final String terms;
+  final String badgeText;
+}
+
+class AppNotification {
+  const AppNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.createdAt,
+    required this.isRead,
+    this.applicationId,
+    this.transactionId,
+  });
+
+  final String id;
+  final String title;
+  final String body;
+  final DateTime createdAt;
+  final bool isRead;
+  final String? applicationId;
+  final String? transactionId;
+
+  AppNotification copyWith({bool? isRead}) {
+    return AppNotification(
+      id: id,
+      title: title,
+      body: body,
+      createdAt: createdAt,
+      isRead: isRead ?? this.isRead,
+      applicationId: applicationId,
+      transactionId: transactionId,
+    );
+  }
+}
+
+class FaqItem {
+  const FaqItem({
+    required this.question,
+    required this.answer,
+  });
+
+  final String question;
+  final String answer;
+}

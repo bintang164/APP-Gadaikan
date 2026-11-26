@@ -15,6 +15,7 @@ class PasswordField extends StatefulWidget {
   final ValueChanged<String>? onFieldSubmitted;
   final bool enabled;
   final Iterable<String>? autofillHints;
+  final AutovalidateMode autovalidateMode;
 
   const PasswordField({
     super.key,
@@ -28,6 +29,7 @@ class PasswordField extends StatefulWidget {
     this.onFieldSubmitted,
     this.enabled = true,
     this.autofillHints,
+    this.autovalidateMode = AutovalidateMode.disabled,
   });
 
   @override
@@ -57,6 +59,7 @@ class _PasswordFieldState extends State<PasswordField> {
       keyboardType: TextInputType.visiblePassword,
       autofillHints: widget.autofillHints,
       textCapitalization: TextCapitalization.none,
+      autovalidateMode: widget.autovalidateMode,
       prefixIcon: Icons.lock_outline_rounded,
       suffixIcon: IconButton(
         onPressed: widget.enabled ? _toggleVisibility : null,

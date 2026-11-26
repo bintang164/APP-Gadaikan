@@ -88,7 +88,8 @@ class AppRouter {
                 GoRoute(
                   path: AppRoutes.home,
                   name: AppRoutes.homeName,
-                  builder: (context, state) => const HomeScreen(),
+                  builder: (context, state) =>
+                      HomeScreen(onNavigateTab: (_) {}),
                 ),
               ],
             ),
@@ -106,7 +107,8 @@ class AppRouter {
                 GoRoute(
                   path: AppRoutes.history,
                   name: AppRoutes.historyName,
-                  builder: (context, state) => const HistoryScreen(),
+                  builder: (context, state) =>
+                      HistoryScreen(onStartNewApplication: () {}),
                 ),
               ],
             ),

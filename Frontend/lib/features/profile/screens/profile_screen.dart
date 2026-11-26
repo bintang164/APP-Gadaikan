@@ -1,116 +1,188 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import '../../../core/state/app_state.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/app_buttons.dart';
+import '../../../core/widgets/app_cards.dart';
+import '../../auth/screens/login_screen.dart';
+import '../../info/screens/faq_screen.dart';
+import '../../info/screens/outlets_screen.dart';
+import '../../info/screens/promos_screen.dart';
 
-import '../../../app/routes/app_routes.dart';
-import '../../../app/theme/app_colors.dart';
-import '../../../app/theme/app_spacing.dart';
-import '../../../app/theme/app_text_styles.dart';
-import '../../../app/widgets/app_card.dart';
-import '../../../app/widgets/secondary_button.dart';
-import '../../../app/widgets/status_badge.dart';
-import '../../../core/config/app_config.dart';
-import '../../../core/providers/session_providers.dart';
-import '../../../core/state/session_controller.dart';
-
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  Future<void> _showInfoDialog(
-    BuildContext context, {
-    required String title,
-    required String message,
-  }) async {
-    await showDialog<void>(
+  Future<void> _showEditProfileDialog(BuildContext context) async {
+    final appState = AppStateScope.of(context);
+    final user = appState.user;
+    if (user == null) return;
+
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: user.name);
+    final phoneCtrl = TextEditingController(text: user.phone);
+    final emailCtrl = TextEditingController(text: user.email ?? '');
+    final addressCtrl = TextEditingController(text: user.address ?? '');
+
+    final saved = await showModalBottomSheet<bool>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(title),
-          content: SingleChildScrollView(child: Text(message)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Tutup'),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: AppSpacing.screenHorizontal,
+          right: AppSpacing.screenHorizontal,
+          top: AppSpacing.lg,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.lg,
+        ),
+        child: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Ubah Profil', style: AppTextStyles.sectionHeading),
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Nama Lengkap'),
+                  validator: (v) =>
+                      AppValidators.requiredField(v, label: 'Nama lengkap'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'Nomor HP'),
+                  validator: AppValidators.phone,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration:
+                      const InputDecoration(labelText: 'Email (Opsional)'),
+                  validator: (v) => AppValidators.email(v, required: false),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: addressCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Alamat'),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                PrimaryButton(
+                  label: 'Simpan Perubahan',
+                  onPressed: () {
+                    if (!formKey.currentState!.validate()) return;
+                    Navigator.of(ctx).pop(true);
+                  },
+                ),
+              ],
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+
+    if (saved == true && context.mounted) {
+      await appState.updateProfile(
+        user.copyWith(
+          name: nameCtrl.text.trim(),
+          phone: phoneCtrl.text.trim(),
+          email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
+          address: addressCtrl.text.trim(),
+        ),
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profil berhasil diperbarui.')),
         );
-      },
+      }
+    }
+  }
+
+  void _showPolicyDialog(BuildContext context, String title, String content) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(
+          child: Text(content, style: AppTextStyles.bodySecondary),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _confirmLogout(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final bool? confirmed = await showDialog<bool>(
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Keluar dari akun?'),
-          content: const Text(
-            'Kamu perlu masuk kembali untuk melihat pengajuan dan riwayat.',
+      builder: (ctx) => AlertDialog(
+        title: const Text('Keluar dari Akun?'),
+        content: const Text(
+          'Anda perlu masuk kembali untuk mengakses data pengajuan dan transaksi Anda.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Batal'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Batal'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text(
-                'Keluar',
-                style: TextStyle(color: AppColors.danger),
-              ),
-            ),
-          ],
-        );
-      },
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
     );
-
-    if (confirmed != true) return;
-
-    await ref.read(sessionControllerProvider).logout();
+    if (confirmed != true || !context.mounted) return;
+    await AppStateScope.of(context).logout();
     if (!context.mounted) return;
-    context.go(AppRoutes.login);
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      LoginScreen.routeName,
+      (route) => false,
+    );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final SessionController session = ref.watch(sessionControllerProvider);
+  Widget build(BuildContext context) {
+    final user = AppStateScope.of(context).user;
+    final initial = (user?.name.trim().isNotEmpty ?? false)
+        ? user!.name.trim()[0].toUpperCase()
+        : 'N';
 
-    return SafeArea(
-      key: const Key('profile_screen'),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.horizontal,
-          AppSpacing.md,
-          AppSpacing.horizontal,
-          AppSpacing.xl,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      appBar: AppBar(title: const Text('Profil')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontal,
+            vertical: AppSpacing.md,
+          ),
           children: [
-            Text('Profil', style: AppTextStyles.headlineMedium),
-            const SizedBox(height: AppSpacing.xxs),
-            Text(
-              'Kelola data akun dan pengaturan aplikasi.',
-              style: AppTextStyles.bodySmall,
-            ),
-            const SizedBox(height: AppSpacing.lg),
             AppCard(
               child: Row(
                 children: [
-                  Container(
-                    width: AppSizes.avatarLg,
-                    height: AppSizes.avatarLg,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primarySoft,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 34,
-                      color: AppColors.primary,
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: AppColors.primary,
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: AppColors.accentGold,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -119,24 +191,30 @@ class ProfileScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          session.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.titleLarge,
+                          user?.name ?? 'Nasabah Demo',
+                          style: AppTextStyles.sectionHeading,
                         ),
-                        const SizedBox(height: AppSpacing.xxs),
+                        const SizedBox(height: 2),
                         Text(
-                          session.userPhone ?? 'Belum ada nomor HP',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.bodySmall,
+                          user?.phone ?? '-',
+                          style: AppTextStyles.bodySecondary,
                         ),
-                        const SizedBox(height: AppSpacing.xs),
-                        const StatusBadge.warning(
-                          label: 'Mode demo',
-                          dense: true,
-                        ),
+                        if (user?.email != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            user!.email!,
+                            style: AppTextStyles.caption,
+                          ),
+                        ],
                       ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => _showEditProfileDialog(context),
+                    tooltip: 'Edit Profil',
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      color: AppColors.primary,
                     ),
                   ),
                 ],
@@ -147,58 +225,50 @@ class ProfileScreen extends ConsumerWidget {
               padding: EdgeInsets.zero,
               child: Column(
                 children: [
-                  _MenuTile(
-                    icon: Icons.edit_outlined,
-                    title: 'Edit profil',
-                    subtitle: 'Nama, nomor HP, dan email',
-                    onTap: () => _showInfoDialog(
-                      context,
-                      title: 'Edit profil',
-                      message:
-                          'Edit profil akan tersedia setelah backend Laravel '
-                          'terhubung. Data akun saat ini masih tersimpan lokal.',
-                    ),
+                  _ProfileTile(
+                    icon: Icons.person_outline_rounded,
+                    title: 'Ubah Data Profil',
+                    onTap: () => _showEditProfileDialog(context),
                   ),
                   const Divider(),
-                  _MenuTile(
+                  _ProfileTile(
+                    icon: Icons.storefront_outlined,
+                    title: 'Daftar Outlet',
+                    onTap: () => Navigator.of(context)
+                        .pushNamed(OutletsScreen.routeName),
+                  ),
+                  const Divider(),
+                  _ProfileTile(
+                    icon: Icons.local_offer_outlined,
+                    title: 'Informasi Promo',
+                    onTap: () =>
+                        Navigator.of(context).pushNamed(PromosScreen.routeName),
+                  ),
+                  const Divider(),
+                  _ProfileTile(
                     icon: Icons.help_outline_rounded,
-                    title: 'Bantuan & FAQ',
-                    subtitle: 'Pertanyaan umum dan kontak bantuan',
-                    onTap: () => _showInfoDialog(
-                      context,
-                      title: 'Bantuan & FAQ',
-                      message:
-                          'Pusat bantuan akan tersedia pada tahap berikutnya. '
-                          'Untuk prototipe ini, gunakan alur demo yang ada.',
-                    ),
+                    title: 'Pusat Bantuan & FAQ',
+                    onTap: () =>
+                        Navigator.of(context).pushNamed(FaqScreen.routeName),
                   ),
                   const Divider(),
-                  _MenuTile(
+                  _ProfileTile(
                     icon: Icons.privacy_tip_outlined,
-                    title: 'Kebijakan privasi',
-                    subtitle: 'Cara data kamu digunakan',
-                    onTap: () => _showInfoDialog(
+                    title: 'Kebijakan Privasi',
+                    onTap: () => _showPolicyDialog(
                       context,
-                      title: 'Kebijakan privasi',
-                      message:
-                          'Gadaikan adalah prototipe akademik. Data demo hanya '
-                          'disimpan di perangkat. Jangan memasukkan data '
-                          'identitas atau dokumen asli.',
+                      'Kebijakan Privasi',
+                      'Gadaikan menjaga kerahasiaan data pribadi dan dokumen sensitif seperti foto BPKB. Dokumen hanya digunakan untuk verifikasi pengajuan dan tidak ditampilkan secara publik. Prototipe ini menggunakan data dummy untuk keperluan demo.',
                     ),
                   ),
                   const Divider(),
-                  _MenuTile(
-                    icon: Icons.info_outline_rounded,
-                    title: 'Tentang aplikasi',
-                    subtitle: 'Versi ${AppConfig.appVersion}',
-                    onTap: () => _showInfoDialog(
+                  _ProfileTile(
+                    icon: Icons.description_outlined,
+                    title: 'Syarat & Ketentuan',
+                    onTap: () => _showPolicyDialog(
                       context,
-                      title: 'Tentang Gadaikan',
-                      message:
-                          '${AppConfig.appName} — ${AppConfig.tagline}.\n\n'
-                          'Prototipe akademik untuk pengajuan gadai digital. '
-                          'Tidak terhubung ke lembaga gadai atau layanan '
-                          'pembayaran resmi.',
+                      'Syarat & Ketentuan',
+                      'Seluruh perhitungan simulasi, penaksiran, dan pembayaran dalam prototipe frontend ini bersifat simulasi akademik dan bukan penawaran kredit atau transaksi keuangan resmi.',
                     ),
                   ),
                 ],
@@ -207,15 +277,15 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.lg),
             SecondaryButton(
               label: 'Keluar',
-              onPressed: () => _confirmLogout(context, ref),
-              isFullWidth: true,
               icon: Icons.logout_rounded,
               foregroundColor: AppColors.danger,
+              borderColor: AppColors.danger,
+              onPressed: () => _confirmLogout(context),
             ),
             const SizedBox(height: AppSpacing.md),
-            Center(
+            const Center(
               child: Text(
-                'Gadaikan v${AppConfig.appVersion} · ${AppConfig.environment}',
+                'Gadaikan v1.0 • Prototipe Frontend Flutter',
                 style: AppTextStyles.caption,
               ),
             ),
@@ -226,30 +296,27 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-class _MenuTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const _MenuTile({
+class _ProfileTile extends StatelessWidget {
+  const _ProfileTile({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.onTap,
   });
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      onTap: onTap,
       leading: Icon(icon, color: AppColors.primary),
-      title: Text(title, style: AppTextStyles.titleSmall),
-      subtitle: Text(subtitle, style: AppTextStyles.caption),
+      title: Text(title, style: AppTextStyles.bodyMedium),
       trailing: const Icon(
         Icons.chevron_right_rounded,
         color: AppColors.textSecondary,
       ),
+      onTap: onTap,
     );
   }
 }
